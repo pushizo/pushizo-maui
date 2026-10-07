@@ -1,20 +1,28 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <!--
-    sdk/android yerel SDK'sının (com.herosignal:herosignal-android) Xamarin.Android binding'i.
-    AAR, derleme sırasında sdk/android kaynaklarından Gradle ile bu projenin build/native klasörüne üretilir
-    (sdk/android altına çıktı yazılmaz). Hazır bir AAR kullanmak için: -p:HeroSignalAndroidAar=<yol>.
+    HeroSignal Android SDK'sı için .NET Android binding'i. İki AAR içerir:
+      - herosignal-release.aar (com.herosignal:herosignal-android): yerel SDK; uygulamaya paketlenir, C#'a bağlanmaz
+        (Bind=false). Kotlin object/lambda/Result tabanlı API'si yerine aşağıdaki köprü kullanılır.
+      - herosignal-maui-bridge-release.aar (com.herosignal.maui): yalnızca metin/JSON ve arayüz geri çağrıları kullanan
+        Java dostu köprü (sdk/maui/native/android/bridge); C#'a bağlanır.
+    AAR'lar derleme sırasında sdk/maui/native/android Gradle projesinden (sdk/android kaynakları dahil edilerek) bu
+    projenin build/native klasörüne üretilir; sdk/android altına çıktı yazılmaz. Hazır AAR kullanmak için:
+    -p:HeroSignalAndroidAar=<yol> -p:HeroSignalBridgeAar=<yol>.
   -->
   <PropertyGroup>
-    <TargetFramework>net9.0-android</TargetFramework>
+    <TargetFrameworks>$(HeroSignalAndroidTargets)</TargetFrameworks>
     <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
     <RootNamespace>HeroSignalSdk.Native.Android</RootNamespace>
     <AssemblyName>HeroSignal.Maui.Android.Binding</AssemblyName>
     <PackageId>HeroSignal.Maui.Android.Binding</PackageId>
     <Description>HeroSignal Android SDK (com.herosignal:herosignal-android) için .NET Android binding'i. Doğrudan değil, HeroSignal.Maui üzerinden kullanılır.</Description>
     <IsPackable>true</IsPackable>
+    <!-- Köprü yüzeyi küçük ve elle tasarlandı; üretilen kodda belge uyarısı beklenmez. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
     <HeroSignalNativeDir>$(MSBuildProjectDirectory)\build\native</HeroSignalNativeDir>
     <HeroSignalAndroidAar Condition="'$(HeroSignalAndroidAar)' == ''">$(HeroSignalNativeDir)\gradle\herosignal\outputs\aar\herosignal-release.aar</HeroSignalAndroidAar>
-    <HeroSignalAndroidSdkDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\android'))</HeroSignalAndroidSdkDir>
+    <HeroSignalBridgeAar Condition="'$(HeroSignalBridgeAar)' == ''">$(HeroSignalNativeDir)\gradle\herosignal-maui-bridge\outputs\aar\herosignal-maui-bridge-release.aar</HeroSignalBridgeAar>
+    <HeroSignalNativeProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\native\android'))</HeroSignalNativeProjectDir>
     <HeroSignalGradleInitScript>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\tools\herosignal-native-out.init.gradle'))</HeroSignalGradleInitScript>
   </PropertyGroup>
 
@@ -33,18 +41,20 @@
   </ItemGroup>
 
   <ItemGroup>
-    <AndroidLibrary Include="$(HeroSignalAndroidAar)" Link="Jars\herosignal-release.aar" />
+    <AndroidLibrary Include="$(HeroSignalAndroidAar)" Link="Jars\herosignal-release.aar" Bind="false" />
+    <AndroidLibrary Include="$(HeroSignalBridgeAar)" Link="Jars\herosignal-maui-bridge-release.aar" />
   </ItemGroup>
 
   <!--
-    AAR yoksa sdk/android'den üretir. Gradle çıktı (build), proje önbelleği (.gradle) ve Kotlin oturum klasörü
-    (.kotlin) bu projenin build/native klasörüne yönlendirilir. Gereken ortam: JAVA_HOME (JDK 17) ve
-    ANDROID_HOME (ya da sdk/android/local.properties içindeki sdk.dir), PATH'te gradle 8.x.
+    AAR'lar yoksa Gradle ile üretilir. Gradle çıktı (build), proje önbelleği (.gradle) ve Kotlin oturum klasörü
+    (.kotlin) bu projenin build/native klasörüne yönlendirilir. Gereken ortam: JAVA_HOME (JDK 17) ve ANDROID_HOME
+    (ya da sdk/maui/native/android/local.properties içindeki sdk.dir), PATH'te gradle 8.x.
   -->
-  <Target Name="HeroSignalBuildNativeAar" BeforeTargets="PrepareForBuild;_ResolveLibraryProjectImports;CollectPackageReferences" Condition="!Exists('$(HeroSignalAndroidAar)')">
-    <Message Importance="high" Text="HeroSignal: yerel Android AAR üretiliyor ($(HeroSignalAndroidSdkDir))" />
-    <Exec Command="gradle -p &quot;$(HeroSignalAndroidSdkDir)&quot; --project-cache-dir &quot;$(HeroSignalNativeDir)\.gradle-project&quot; -I &quot;$(HeroSignalGradleInitScript)&quot; -PherosignalOutDir=&quot;$(HeroSignalNativeDir)\gradle&quot; -Pkotlin.project.persistent.dir=&quot;$(HeroSignalNativeDir)\.kotlin&quot; :herosignal:assembleRelease --console=plain -q" />
+  <Target Name="HeroSignalBuildNativeAar" BeforeTargets="PrepareForBuild;_ResolveLibraryProjectImports;CollectPackageReferences" Condition="!Exists('$(HeroSignalAndroidAar)') or !Exists('$(HeroSignalBridgeAar)')">
+    <Message Importance="high" Text="HeroSignal: yerel Android AAR'ları üretiliyor ($(HeroSignalNativeProjectDir))" />
+    <Exec Command="gradle -p &quot;$(HeroSignalNativeProjectDir)&quot; --project-cache-dir &quot;$(HeroSignalNativeDir)\.gradle-project&quot; -I &quot;$(HeroSignalGradleInitScript)&quot; -PherosignalOutDir=&quot;$(HeroSignalNativeDir)\gradle&quot; -Pkotlin.project.persistent.dir=&quot;$(HeroSignalNativeDir)\.kotlin&quot; :herosignal:assembleRelease :herosignal-maui-bridge:assembleRelease --console=plain -q" />
     <Error Condition="!Exists('$(HeroSignalAndroidAar)')" Text="HeroSignal: AAR üretilemedi: $(HeroSignalAndroidAar)" />
+    <Error Condition="!Exists('$(HeroSignalBridgeAar)')" Text="HeroSignal: köprü AAR'ı üretilemedi: $(HeroSignalBridgeAar)" />
   </Target>
 
   <Target Name="HeroSignalCleanNativeAar" AfterTargets="Clean">

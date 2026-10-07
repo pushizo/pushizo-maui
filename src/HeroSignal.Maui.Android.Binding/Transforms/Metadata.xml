@@ -1,4 +1,4 @@
 <metadata>
-  <!-- Java paketi → .NET ad alanı. -->
-  <attr path="/api/package[@name='com.herosignal.sdk']" name="managedName">HeroSignalSdk.Native.Android</attr>
+  <!-- Köprü Java paketi → .NET ad alanı. Yerel SDK AAR'ı (com.herosignal.sdk) Bind=false ile bağlanmaz. -->
+  <attr path="/api/package[@name='com.herosignal.maui']" name="managedName">HeroSignalSdk.Native.Android</attr>
 </metadata>

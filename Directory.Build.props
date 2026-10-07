@@ -4,7 +4,9 @@
     <HeroSignalVersion>0.1.0</HeroSignalVersion>
     <!-- Yerel Android SDK'sının (sdk/android) yayın sürümü; binding paketi bu sürümü sarar. -->
     <HeroSignalNativeAndroidVersion>0.1.0</HeroSignalNativeAndroidVersion>
-    <MauiVersion>9.0.120</MauiVersion>
+    <!-- MAUI paket sürümleri hedef .NET sürümüne göre seçilir (MAUI 9 paketleri net8.0 hedeflerini içermez). -->
+    <MauiVersion Condition="'$(MauiVersion)' == '' and $(TargetFramework.StartsWith('net8.0'))">8.0.100</MauiVersion>
+    <MauiVersion Condition="'$(MauiVersion)' == ''">9.0.120</MauiVersion>
     <Version>$(HeroSignalVersion)</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
@@ -17,5 +19,16 @@
     <PackageTags>herosignal;push;notifications;in-app;inbox;maui;android;ios</PackageTags>
     <!-- iOS hedefi yalnızca macOS'ta (Xcode + maui-ios iş yükü) ya da açıkça istendiğinde derlenir. -->
     <HeroSignalIncludeIos Condition="'$(HeroSignalIncludeIos)' == '' and $([MSBuild]::IsOSPlatform('osx'))">true</HeroSignalIncludeIos>
+    <!--
+      Android hedefi varsayılan olarak derlenir (maui-android iş yükü + JDK 17 + Android SDK gerekir). İş yükü olmayan
+      makinelerde (ör. yalnızca paylaşılan katmanın birim testleri) -p:HeroSignalIncludeAndroid=false verilir.
+    -->
+    <HeroSignalIncludeAndroid Condition="'$(HeroSignalIncludeAndroid)' == ''">true</HeroSignalIncludeAndroid>
+    <!-- net9.0 hedefleri yalnızca .NET 9+ SDK ile eklenir (.NET 8 SDK'sı net9.0 hedefini geri yükleyemez). -->
+    <HeroSignalNet9 Condition="'$(NETCoreSdkVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '9.0'))">true</HeroSignalNet9>
+    <HeroSignalAndroidTargets>net8.0-android</HeroSignalAndroidTargets>
+    <HeroSignalAndroidTargets Condition="'$(HeroSignalNet9)' == 'true'">net8.0-android;net9.0-android</HeroSignalAndroidTargets>
+    <HeroSignalIosTargets>net8.0-ios</HeroSignalIosTargets>
+    <HeroSignalIosTargets Condition="'$(HeroSignalNet9)' == 'true'">net8.0-ios;net9.0-ios</HeroSignalIosTargets>
   </PropertyGroup>
 </Project>

@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    HeroSignal .NET MAUI SDK (NuGet: HeroSignal.Maui).
+    Hedefler:
+      net8.0 / net9.0            → platformdan bağımsız katman (Windows/MacCatalyst uygulamalarında çağrılar etkisizdir;
+                                   birim testleri bu hedefle çalışır)
+      net8.0-android / net9.0-android → yerel Android SDK'sı (HeroSignal.Maui.Android.Binding üzerinden)
+      net8.0-ios / net9.0-ios    → yerel iOS SDK'sı (HeroSignal.Maui.iOS.Binding üzerinden; yalnızca macOS'ta derlenir)
+    Android iş yükü olmayan makinede: dotnet build -p:HeroSignalIncludeAndroid=false
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(HeroSignalNet9)' == 'true'">$(TargetFrameworks);net9.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(HeroSignalIncludeAndroid)' == 'true'">$(TargetFrameworks);$(HeroSignalAndroidTargets)</TargetFrameworks>
+    <TargetFrameworks Condition="'$(HeroSignalIncludeIos)' == 'true'">$(TargetFrameworks);$(HeroSignalIosTargets)</TargetFrameworks>
+    <RootNamespace>HeroSignalSdk.Maui</RootNamespace>
+    <AssemblyName>HeroSignal.Maui</AssemblyName>
+    <PackageId>HeroSignal.Maui</PackageId>
+    <Description>HeroSignal .NET MAUI SDK: push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, e-posta ve SMS abonelikleri. Yerel HeroSignal Android ve iOS SDK'larını sarar.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Public üyelerin bir kısmı kendini açıklayan adlara sahip; eksik XML yorumu uyarısı derlemeyi kirletmesin. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">true</IsAotCompatible>
+    <HeroSignalPlatform>none</HeroSignalPlatform>
+    <HeroSignalPlatform Condition="$(TargetFramework.Contains('-android'))">android</HeroSignalPlatform>
+    <HeroSignalPlatform Condition="$(TargetFramework.Contains('-ios'))">ios</HeroSignalPlatform>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(HeroSignalPlatform)' == 'android'">
+    <SupportedOSPlatformVersion>23.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(HeroSignalPlatform)' == 'ios'">
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      MauiAppBuilder.UseHeroSignal(), yaşam döngüsü olayları ve Platform.CurrentActivity için MAUI çekirdek paketi.
+      Kütüphane UseMaui kullanmaz; böylece yalnızca android/ios iş yükleri yeterlidir.
+    -->
+    <PackageReference Include="Microsoft.Maui.Core" Version="$(MauiVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="HeroSignal.Maui.Tests" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Platform klasörleri yalnızca ilgili hedefte derlenir. -->
+  <ItemGroup Condition="'$(HeroSignalPlatform)' != 'android'">
+    <Compile Remove="Platforms\Android\**\*.cs" />
+    <None Include="Platforms\Android\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(HeroSignalPlatform)' != 'ios'">
+    <Compile Remove="Platforms\iOS\**\*.cs" />
+    <None Include="Platforms\iOS\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(HeroSignalPlatform)' == 'android'">
+    <ProjectReference Include="..\HeroSignal.Maui.Android.Binding\HeroSignal.Maui.Android.Binding.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(HeroSignalPlatform)' == 'ios'">
+    <ProjectReference Include="..\HeroSignal.Maui.iOS.Binding\HeroSignal.Maui.iOS.Binding.csproj" />
+  </ItemGroup>
+</Project>

@@ -40,8 +40,9 @@ public static class HeroSignal
     public static DebugManager Debug { get; } = new();
 
     /// <summary>
-    /// SDK'yı başlatır (uygulama açılışında bir kez; <c>MauiProgram.CreateMauiApp</c> veya <c>App</c> kurucusu).
-    /// Aynı App ID ile tekrar çağrı etkisizdir.
+    /// SDK'yı başlatır (uygulama açılışında bir kez; <c>MauiProgram.CreateMauiApp</c> içinde
+    /// <c>builder.UseHeroSignal(...)</c> ya da doğrudan bu metot). Aynı App ID ile tekrar çağrı etkisizdir;
+    /// farklı App ID <see cref="InvalidOperationException"/> üretir.
     /// </summary>
     public static void Initialize(string appId, HeroSignalOptions? options = null)
     {
@@ -49,13 +50,21 @@ public static class HeroSignal
         var opts = (options ?? new HeroSignalOptions()).Clone();
         if (string.IsNullOrWhiteSpace(opts.ApiUrl) || !Uri.TryCreate(opts.ApiUrl, UriKind.Absolute, out var api) || (api.Scheme != Uri.UriSchemeHttps && api.Scheme != Uri.UriSchemeHttp))
             throw new ArgumentException("ApiUrl http(s) ile başlayan mutlak bir adres olmalı.", nameof(options));
+        if (Debug.ExplicitLevel is { } explicitLevel) opts.LogLevel = explicitLevel;
         lock (s_gate)
         {
-            if (s_initialized && s_appId == appId) return;
+            if (s_initialized)
+            {
+                if (s_appId == appId) return;
+                throw new InvalidOperationException("HeroSignal farklı bir App ID ile zaten başlatıldı; App ID uygulama ömrü boyunca değiştirilemez.");
+            }
             SdkLog.Level = opts.LogLevel;
             s_platform.Initialize(appId, opts, Sink);
             s_appId = appId;
             s_initialized = true;
+            // Başlangıç durumları tohumlanır; sonraki olaylar yalnızca gerçek değişiklikte üretilir.
+            User.PushSubscription.Seed(s_platform.PushSubscription);
+            Notifications.DispatchPermission(s_platform.NotificationPermission);
         }
         if (!s_platform.IsSupported)
             SdkLog.Write(LogLevel.Warn, "bu platformda yerel HeroSignal SDK'sı yok; çağrılar etkisiz (yalnızca Android ve iOS desteklenir)");
@@ -95,6 +104,8 @@ public static class HeroSignal
             User.PushSubscription.Reset();
             Notifications.Reset();
             InAppMessages.Reset();
+            Debug.Reset();
+            SdkLog.Level = LogLevel.Warn;
         }
     }
 

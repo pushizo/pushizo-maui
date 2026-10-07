@@ -119,6 +119,12 @@ public sealed class PushSubscriptionManager
         HeroSignal.Notifications.DispatchPermission(state.Permission);
     }
 
+    /// <summary>Başlangıç durumunu olay üretmeden kaydeder.</summary>
+    internal void Seed(PushSubscriptionState state)
+    {
+        lock (_gate) _last = state;
+    }
+
     internal void Reset()
     {
         lock (_gate) _last = PushSubscriptionState.Empty;

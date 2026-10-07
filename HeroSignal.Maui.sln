@@ -1,0 +1,50 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{1846967F-002E-4B6E-B3CB-8991B1661B4A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeroSignal.Maui", "src\HeroSignal.Maui\HeroSignal.Maui.csproj", "{07E3F561-AD48-4288-B8AF-0B52D8345871}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeroSignal.Maui.Android.Binding", "src\HeroSignal.Maui.Android.Binding\HeroSignal.Maui.Android.Binding.csproj", "{8AC07ABB-AA72-45DB-9F1A-C2311C592380}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeroSignal.Maui.iOS.Binding", "src\HeroSignal.Maui.iOS.Binding\HeroSignal.Maui.iOS.Binding.csproj", "{BC14907F-EBE8-4E5B-9EF6-3A12A05437F2}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{4A999E2F-EE35-4CCA-8906-C4137D7D4758}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HeroSignal.Maui.Tests", "tests\HeroSignal.Maui.Tests\HeroSignal.Maui.Tests.csproj", "{902E80CB-D347-4CAC-8C05-9FBC4A369AFC}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{07E3F561-AD48-4288-B8AF-0B52D8345871}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{07E3F561-AD48-4288-B8AF-0B52D8345871}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{07E3F561-AD48-4288-B8AF-0B52D8345871}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{07E3F561-AD48-4288-B8AF-0B52D8345871}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8AC07ABB-AA72-45DB-9F1A-C2311C592380}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AC07ABB-AA72-45DB-9F1A-C2311C592380}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AC07ABB-AA72-45DB-9F1A-C2311C592380}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AC07ABB-AA72-45DB-9F1A-C2311C592380}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BC14907F-EBE8-4E5B-9EF6-3A12A05437F2}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC14907F-EBE8-4E5B-9EF6-3A12A05437F2}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC14907F-EBE8-4E5B-9EF6-3A12A05437F2}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC14907F-EBE8-4E5B-9EF6-3A12A05437F2}.Release|Any CPU.Build.0 = Release|Any CPU
+		{902E80CB-D347-4CAC-8C05-9FBC4A369AFC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{902E80CB-D347-4CAC-8C05-9FBC4A369AFC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{902E80CB-D347-4CAC-8C05-9FBC4A369AFC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{902E80CB-D347-4CAC-8C05-9FBC4A369AFC}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{07E3F561-AD48-4288-B8AF-0B52D8345871} = {1846967F-002E-4B6E-B3CB-8991B1661B4A}
+		{8AC07ABB-AA72-45DB-9F1A-C2311C592380} = {1846967F-002E-4B6E-B3CB-8991B1661B4A}
+		{BC14907F-EBE8-4E5B-9EF6-3A12A05437F2} = {1846967F-002E-4B6E-B3CB-8991B1661B4A}
+		{902E80CB-D347-4CAC-8C05-9FBC4A369AFC} = {4A999E2F-EE35-4CCA-8906-C4137D7D4758}
+	EndGlobalSection
+EndGlobal

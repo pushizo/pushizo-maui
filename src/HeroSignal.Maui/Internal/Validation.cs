@@ -10,13 +10,13 @@ internal static partial class Validation
 {
     public const int MaxAliasesPerRequest = 20;
 
-    [GeneratedRegex("^[^\s@\"(),:;<>\[\\\]]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)+$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[^\s@""(),:;<>\[\\\]]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)+$", RegexOptions.CultureInvariant)]
     private static partial Regex EmailRegex();
 
-    [GeneratedRegex("^\+[1-9][0-9]{6,14}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\+[1-9][0-9]{6,14}$", RegexOptions.CultureInvariant)]
     private static partial Regex E164Regex();
 
-    [GeneratedRegex("[\s().-]", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"[\s().-]", RegexOptions.CultureInvariant)]
     private static partial Regex PhoneSeparatorsRegex();
 
     [GeneratedRegex("^[a-z0-9_]{1,50}$", RegexOptions.CultureInvariant)]

@@ -3,9 +3,9 @@ using System.Text.Json;
 namespace HeroSignalSdk.Maui.Internal;
 
 /// <summary>
-/// iOS köprüsünün (<c>HSMauiBridge</c>) döndürdüğü JSON biçimlerinin ayrıştırıcısı. Biçimler köprü kaynağında
-/// (<c>HeroSignal.Maui.iOS.Binding/native/Sources/HeroSignalMauiBridge/HSMauiBridge.swift</c>) tanımlıdır;
-/// zamanlar epoch milisaniyedir.
+/// Yerel köprülerin (Android <c>native/android/bridge/…/HeroSignalMauiBridge.kt</c>, iOS
+/// <c>HeroSignal.Maui.iOS.Binding/native/Sources/HeroSignalMauiBridge/HSMauiBridge.swift</c>) döndürdüğü ortak JSON
+/// biçimlerinin ayrıştırıcısı ve yazıcısı; zamanlar epoch milisaniyedir.
 /// </summary>
 internal static class BridgeJson
 {
@@ -79,6 +79,67 @@ internal static class BridgeJson
         if (string.IsNullOrEmpty(json)) return new Dictionary<string, string>();
         using var doc = Parse(json);
         return ReadStringMap(doc.RootElement);
+    }
+
+    /// <summary><c>{"eventId":"…","notification":{…}}</c>.</summary>
+    public static (string EventId, HeroSignalNotification Notification) ParseForeground(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        var eventId = Str(root, "eventId") ?? throw Invalid("eventId");
+        var notification = root.TryGetProperty("notification", out var n) && n.ValueKind == JsonValueKind.Object
+            ? ReadNotification(n)
+            : new HeroSignalNotification();
+        return (eventId, notification);
+    }
+
+    /// <summary><c>["a","b"]</c> biçimindeki metin listesi (e-posta/SMS).</summary>
+    public static IReadOnlyList<string> ParseStringList(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return Array.Empty<string>();
+        using var doc = Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.Array) return Array.Empty<string>();
+        var list = new List<string>();
+        foreach (var e in doc.RootElement.EnumerateArray())
+        {
+            if (e.ValueKind == JsonValueKind.String) list.Add(e.GetString()!);
+        }
+        return list;
+    }
+
+    /// <summary><c>{"unreadCount":n}</c>.</summary>
+    public static int ParseUnreadCount(string json)
+    {
+        using var doc = Parse(json);
+        return doc.RootElement.TryGetProperty("unreadCount", out var u) && u.ValueKind == JsonValueKind.Number && u.TryGetInt32(out var n)
+            ? n
+            : throw Invalid("unreadCount");
+    }
+
+    /// <summary>Yerel köprünün başlatma seçenekleri (<c>HeroSignalMauiBridge.start</c> / <c>HSMauiBridge.start</c>).</summary>
+    public static string OptionsToJson(HeroSignalOptions options)
+    {
+        using var stream = new MemoryStream();
+        using (var w = new Utf8JsonWriter(stream))
+        {
+            w.WriteStartObject();
+            w.WriteString("apiUrl", options.ApiUrl);
+            w.WriteBoolean("requiresPrivacyConsent", options.RequiresPrivacyConsent);
+            w.WriteNumber("logLevel", (int)options.LogLevel);
+            w.WriteString("androidDefaultChannelName", options.AndroidDefaultChannelName);
+            w.WriteString("androidDefaultChannelId", options.AndroidDefaultChannelId);
+            WriteOptional(w, "iosAppGroup", options.IosAppGroup);
+            WriteOptional(w, "iosApnsEnvironment", options.IosApnsEnvironment);
+            w.WriteBoolean("iosProvisionalAuthorization", options.IosProvisionalAuthorization);
+            w.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    private static void WriteOptional(Utf8JsonWriter w, string name, string? value)
+    {
+        if (string.IsNullOrEmpty(value)) w.WriteNull(name);
+        else w.WriteString(name, value);
     }
 
     public static string ToJson(IReadOnlyDictionary<string, string> map) => JsonSerializer.Serialize(map, BridgeJsonContext.Default.IReadOnlyDictionaryStringString);

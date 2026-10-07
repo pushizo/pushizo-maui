@@ -1,5 +1,7 @@
-// sdk/android yerel SDK'sını bu deponun dışına (çağıranın verdiği klasöre) derler; sdk/android altına çıktı yazılmaz.
-// Kullanım: gradle -p sdk/android -I herosignal-native-out.init.gradle -PherosignalOutDir=<klasör> :herosignal:assembleRelease
+// Yerel Android derlemesinin (sdk/maui/native/android; sdk/android/herosignal kaynaktan dahil edilir) çıktılarını
+// çağıranın verdiği klasöre yönlendirir; sdk/android ve sdk/maui/native altına build çıktısı yazılmaz.
+// Kullanım: gradle -p sdk/maui/native/android -I herosignal-native-out.init.gradle -PherosignalOutDir=<klasör> \
+//           :herosignal:assembleRelease :herosignal-maui-bridge:assembleRelease
 def outRoot = gradle.startParameter.projectProperties['herosignalOutDir']
 if (outRoot == null || outRoot.trim().isEmpty()) {
     throw new GradleException('herosignalOutDir özelliği gerekli (-PherosignalOutDir=<klasör>).')
