@@ -1,0 +1,21 @@
+<Project>
+  <!-- HeroSignal .NET MAUI SDK: tüm projelerde ortak sürüm ve derleme ayarları. -->
+  <PropertyGroup>
+    <HeroSignalVersion>0.1.0</HeroSignalVersion>
+    <!-- Yerel Android SDK'sının (sdk/android) yayın sürümü; binding paketi bu sürümü sarar. -->
+    <HeroSignalNativeAndroidVersion>0.1.0</HeroSignalNativeAndroidVersion>
+    <MauiVersion>9.0.120</MauiVersion>
+    <Version>$(HeroSignalVersion)</Version>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Authors>HeroSignal</Authors>
+    <Company>HeroSignal</Company>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/herosignal/herosignal</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/herosignal/herosignal</RepositoryUrl>
+    <PackageTags>herosignal;push;notifications;in-app;inbox;maui;android;ios</PackageTags>
+    <!-- iOS hedefi yalnızca macOS'ta (Xcode + maui-ios iş yükü) ya da açıkça istendiğinde derlenir. -->
+    <HeroSignalIncludeIos Condition="'$(HeroSignalIncludeIos)' == '' and $([MSBuild]::IsOSPlatform('osx'))">true</HeroSignalIncludeIos>
+  </PropertyGroup>
+</Project>

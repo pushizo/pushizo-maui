@@ -1,0 +1,9 @@
+// sdk/android yerel SDK'sını bu deponun dışına (çağıranın verdiği klasöre) derler; sdk/android altına çıktı yazılmaz.
+// Kullanım: gradle -p sdk/android -I herosignal-native-out.init.gradle -PherosignalOutDir=<klasör> :herosignal:assembleRelease
+def outRoot = gradle.startParameter.projectProperties['herosignalOutDir']
+if (outRoot == null || outRoot.trim().isEmpty()) {
+    throw new GradleException('herosignalOutDir özelliği gerekli (-PherosignalOutDir=<klasör>).')
+}
+allprojects { p ->
+    p.layout.buildDirectory.set(new File(outRoot, p.name == rootProject.name ? 'root' : p.name))
+}
