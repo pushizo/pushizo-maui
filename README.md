@@ -72,7 +72,7 @@ HeroSignal.User.AddEmail("ali@example.com");
 HeroSignal.User.AddSms("+905321234567");
 
 HeroSignal.User.PushSubscription.Changed += (_, e) => Console.WriteLine(e.Current.Id);
-HeroSignal.Notifications.PermissionChanged += (_, e) => Console.WriteLine(e.Permission);
+HeroSignal.Notifications.PermissionChanged += (_, e) => Console.WriteLine(e.Permission); // yerel izin gözlemcisinden
 HeroSignal.Notifications.Clicked += (_, e) => Navigate(e.Url);
 HeroSignal.Notifications.ForegroundWillDisplay += (_, e) =>
 {
@@ -113,6 +113,8 @@ HeroSignal (C# cephe, doğrulama, olaylar)  ──  BridgePlatform (JSON sözle�
 Yerel SDK'ların Kotlin `object`/lambda/`Result` ve Swift `enum`/async API'leri doğrudan bağlanamadığı için her
 platformda yalnızca metin (JSON), bool, sayı ve geri çağrı kullanan küçük bir köprü vardır. İki köprü aynı JSON
 biçimlerini üretir; ayrıştırma ve olay yönlendirme platformdan bağımsız katmandadır ve birim testleriyle doğrulanır.
+İzin değişiklikleri yerel SDK izin gözlemcisinden (`addPermissionObserver`) `permission` olayı (`{"permission":bool}`)
+olarak gelir; köprüler ön plana dönüşte kendi izin yoklamasını yapmaz.
 
 ## Derleme ve test
 

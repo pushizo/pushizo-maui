@@ -8,6 +8,7 @@ namespace HeroSignalSdk.Maui.Internal;
 /// <item><c>click</c>: <c>{"notification":{…},"actionId","url"}</c></item>
 /// <item><c>foreground</c>: <c>{"eventId","notification":{…}}</c> — işleyiciler eşzamanlı çalışır, karar köprüye iletilir</item>
 /// <item><c>subscription</c>: <c>{"id","token","optedIn","permission"}</c></item>
+/// <item><c>permission</c>: <c>{"permission"}</c> — yerel SDK izin gözlemcisinden (yalnızca gerçek değişiklikte)</item>
 /// <item><c>inAppClick</c>: <c>{"messageId","actionId","url"}</c></item>
 /// <item><c>inAppLifecycle</c>: <c>{"event":"willDisplay|didDisplay|willDismiss|didDismiss","messageId","json"}</c></item>
 /// </list>
@@ -18,6 +19,7 @@ internal static class BridgeEvents
     public const string Click = "click";
     public const string Foreground = "foreground";
     public const string Subscription = "subscription";
+    public const string Permission = "permission";
     public const string InAppClick = "inAppClick";
     public const string InAppLifecycle = "inAppLifecycle";
 
@@ -41,6 +43,10 @@ internal static class BridgeEvents
             case Subscription:
                 // İzin değişikliği de abonelik durumunun parçasıdır (PushSubscriptionManager iletir).
                 sink.OnPushSubscriptionChanged(BridgeJson.ParseSubscriptionState(json));
+                break;
+            case Permission:
+                // Yinelenen bildirim (abonelik olayıyla birlikte) NotificationsManager'da elenir.
+                sink.OnPermissionChanged(BridgeJson.ParsePermission(json));
                 break;
             case InAppClick:
                 sink.OnInAppClicked(BridgeJson.ParseInAppClick(json));

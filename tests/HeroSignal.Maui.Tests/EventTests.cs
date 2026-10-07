@@ -100,6 +100,25 @@ public sealed class EventTests : HeroSignalTestBase
     }
 
     [Fact]
+    public void Native_permission_observer_event_raises_permission_changed_once()
+    {
+        Bridge.SubscriptionJson = """{"id":"sub_1","token":"tok","optedIn":true,"permission":false}""";
+        Bridge.PermissionValue = false;
+        InitializeSdk();
+
+        var permissions = new List<bool>();
+        HeroSignal.Notifications.PermissionChanged += (_, e) => permissions.Add(e.Permission);
+
+        // Yerel izin gözlemcisi olayı; ardından gelen abonelik olayı aynı değişikliği tekrar bildirmez.
+        Bridge.Emit("permission", """{"permission":true}""");
+        Bridge.Emit("subscription", """{"id":"sub_1","token":"tok","optedIn":true,"permission":true}""");
+        Bridge.Emit("permission", """{"permission":true}""");
+        Bridge.Emit("permission", """{"permission":false}""");
+
+        Assert.Equal(new[] { true, false }, permissions);
+    }
+
+    [Fact]
     public void In_app_click_and_lifecycle_events_are_mapped()
     {
         InitializeSdk();

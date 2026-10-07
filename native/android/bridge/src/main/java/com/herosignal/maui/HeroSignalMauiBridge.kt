@@ -55,7 +55,6 @@ object HeroSignalMauiBridge {
     @Volatile private var listener: HeroSignalMauiListener? = null
     @Volatile private var appContext: Context? = null
     @Volatile private var listenersRegistered = false
-    @Volatile private var lastPermission: Boolean? = null
 
     /** Ön planda bekleyen bildirim kararları (`foreground` olayının `eventId`'si → olay). */
     private val foregroundEvents = object : LinkedHashMap<String, HsForegroundEvent>() {
@@ -81,10 +80,13 @@ object HeroSignalMauiBridge {
         if (!e.prevented) synchronized(foregroundEvents) { foregroundEvents.remove(eventId) }
     }
 
-    private val subscriptionObserver: (HsPushSubscriptionState) -> Unit = { s ->
-        lastPermission = s.permission
-        emit("subscription", subscriptionJson(s))
-    }
+    private val subscriptionObserver: (HsPushSubscriptionState) -> Unit = { s -> emit("subscription", subscriptionJson(s)) }
+
+    /**
+     * Yerel SDK izin gözlemcisi → `permission` olayı (`{"permission":bool}`). İzin isteği sonucu ve uygulama ön plana
+     * döndüğünde (izin sistem ayarlarından değişmiş olabilir) etkin izin değiştiyse çağrılır.
+     */
+    private val permissionObserver: (Boolean) -> Unit = { granted -> emit("permission", JSONObject().put("permission", granted)) }
 
     private val inAppClickListener: (HsInAppClickEvent) -> Unit = { e ->
         emit("inAppClick", JSONObject().put("messageId", e.messageId).put("actionId", e.actionId).put("url", e.url ?: JSONObject.NULL))
@@ -100,15 +102,13 @@ object HeroSignalMauiBridge {
         override fun onDidDismiss(event: HsInAppLifecycleEvent) = send("didDismiss", event)
     }
 
-    /** Ön plana dönüşte izin isteği sonucunu ve ayarlardan yapılan izin değişikliklerini yakalar. */
+    /**
+     * Ön plana dönüşte bekleyen izin isteğini sonuçlandırır (sonuç `onRequestPermissionsResult` ile gelmediyse).
+     * Ayarlardan yapılan izin değişikliklerini yerel SDK izin gözlemcisi yakalar.
+     */
     private val activityCallbacks = object : Application.ActivityLifecycleCallbacks {
         override fun onActivityResumed(activity: Activity) {
             resolvePermissionRequest()
-            val now = HeroSignal.Notifications.permission
-            val previous = lastPermission
-            lastPermission = now
-            // Kullanıcı izni sistem ayarlarından değiştirdiyse abonelik güncellenir ve gözlemciler bilgilendirilir.
-            if (previous != null && previous != now) HeroSignal.Notifications.onPermissionResult()
         }
 
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
@@ -145,13 +145,13 @@ object HeroSignalMauiBridge {
             listenersRegistered = true
             (ctx as? Application)?.registerActivityLifecycleCallbacks(activityCallbacks)
             HeroSignal.User.pushSubscription.addObserver(subscriptionObserver)
+            HeroSignal.Notifications.addPermissionObserver(permissionObserver)
             HeroSignal.Notifications.addForegroundLifecycleListener(foregroundListener)
             HeroSignal.InAppMessages.addClickListener(inAppClickListener)
             HeroSignal.InAppMessages.addLifecycleListener(inAppLifecycleListener)
             // En son: bekleyen (uygulamayı açan) tıklama bu çağrıda iletilir.
             HeroSignal.Notifications.addClickListener(clickListener)
         }
-        lastPermission = HeroSignal.Notifications.permission
     }
 
     @JvmStatic fun setConsentGiven(given: Boolean) = HeroSignal.setConsentGiven(given)
@@ -246,9 +246,9 @@ object HeroSignalMauiBridge {
             activity = permissionActivity?.get()
             permissionActivity = null
         }
+        // İzin değiştiyse yerel SDK izin gözlemcisi `permission` olayını gönderir.
         HeroSignal.Notifications.onPermissionResult()
         val granted = HeroSignal.Notifications.permission
-        lastPermission = granted
         // Gerekçe gösterilemiyorsa izin kalıcı olarak reddedilmiştir (sistem iletişim kutusu artık açılmaz).
         if (!granted && fallback && activity != null &&
             !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)

@@ -24,7 +24,6 @@ public final class HSMauiBridge: NSObject {
     private static var cachedPermission = false
     private static var cachedStateKnown = false
     private static let lifecycleRelay = LifecycleRelay()
-    private static var activeObserver: NSObjectProtocol?
 
     // MARK: Başlatma
 
@@ -71,9 +70,11 @@ public final class HSMauiBridge: NSObject {
                 emit("inAppClick", ["messageId": event.messageId, "actionId": event.actionId, "url": event.url ?? NSNull()])
             }
             HeroSignal.InAppMessages.addLifecycleListener(lifecycleRelay)
-            // İzin Ayarlar'dan değiştirilmiş olabilir: ön plana dönüşte durum yenilenir.
-            activeObserver = NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
-                refreshState()
+            // Yerel SDK izin gözlemcisi → `permission` olayı (`{"permission":bool}`): requestPermission sonrası ve uygulama
+            // yeniden etkinleştiğinde (izin Ayarlar'dan değişmiş olabilir) etkin izin değiştiyse çağrılır.
+            HeroSignal.Notifications.addPermissionObserver { granted in
+                lock.lock(); cachedPermission = granted; lock.unlock()
+                emit("permission", ["permission": granted])
             }
             // En son: uygulamayı açan (bekleyen) tıklama bu çağrıda iletilir.
             HeroSignal.Notifications.addClickListener { event in
