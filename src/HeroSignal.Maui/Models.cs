@@ -23,6 +23,13 @@ public sealed record HeroSignalNotification
     /// <summary>Teslimat kimliği (<c>hs.dlv</c>); Mesaj İzleme'deki kayıtla eşleşir.</summary>
     public string? DeliveryId { get; init; }
     public string? MessageId { get; init; }
+    /// <summary>
+    /// Bildirim tepsisindeki kimlik (<see cref="NotificationsManager.RemoveNotification(string)"/> için): Android'de sistem
+    /// bildirim kimliği (sayı), iOS'ta teslimat kimliği. Tepsiye düşmemiş bildirimlerde null olabilir.
+    /// </summary>
+    public string? NotificationId { get; init; }
+    /// <summary>Bildirim grubu (Android <c>hs_group</c>; <see cref="NotificationsManager.RemoveGroupedNotifications"/> için).</summary>
+    public string? Group { get; init; }
     public IReadOnlyList<NotificationAction> Actions { get; init; } = Array.Empty<NotificationAction>();
     /// <summary>Müşteri verileri (<c>hs_</c> önekli alanlar hariç).</summary>
     public IReadOnlyDictionary<string, string> Data { get; init; } = EmptyStringMap.Instance;
@@ -70,6 +77,8 @@ public sealed class HeroSignalException : Exception
     public const string NotReady = "NOT_READY";
     public const string PlatformNotSupported = "PLATFORM_NOT_SUPPORTED";
     public const string InvalidResponse = "INVALID_RESPONSE";
+    /// <summary>Yerel SDK'dan beklenmeyen hata (ayrıntı <see cref="Exception.InnerException"/> içinde).</summary>
+    public const string NativeError = "NATIVE_ERROR";
 
     public HeroSignalException(string code, string message, Exception? innerException = null)
         : base(message, innerException)

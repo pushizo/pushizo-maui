@@ -1,4 +1,5 @@
 using HeroSignalSdk.Maui.Internal;
+using HeroSignalSdk.Maui.Platforms;
 
 namespace HeroSignalSdk.Maui;
 

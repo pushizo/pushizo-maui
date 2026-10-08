@@ -40,6 +40,9 @@ internal interface IHeroSignalPlatform
     bool NotificationPermission { get; }
     Task<bool> RequestPermissionAsync(bool fallbackToSettings);
     void ClearAllNotifications();
+    /// <summary>Android: sistem bildirim kimliği (sayı); iOS: istek kimliği veya teslimat kimliği.</summary>
+    void RemoveNotification(string id);
+    void RemoveGroupedNotifications(string group);
 
     // In-app
     void AddTriggers(IReadOnlyDictionary<string, string> triggers);

@@ -81,6 +81,82 @@ internal static class BridgeJson
         return ReadStringMap(doc.RootElement);
     }
 
+    /// <summary><c>["a","b"]</c> biçimindeki metin listesi (e-posta/SMS listeleri); metin olmayan öğeler atlanır.</summary>
+    public static IReadOnlyList<string> ParseStringList(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return Array.Empty<string>();
+        using var doc = Parse(json);
+        if (doc.RootElement.ValueKind != JsonValueKind.Array) return Array.Empty<string>();
+        var list = new List<string>();
+        foreach (var item in doc.RootElement.EnumerateArray())
+        {
+            if (item.ValueKind == JsonValueKind.String) list.Add(item.GetString()!);
+        }
+        return list;
+    }
+
+    /// <summary>Ön plan olayı: <c>{"eventId":"…","notification":{…}}</c>.</summary>
+    public static (string EventId, HeroSignalNotification Notification) ParseForeground(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        var eventId = Str(root, "eventId") ?? throw Invalid("eventId");
+        var notification = root.TryGetProperty("notification", out var n) && n.ValueKind == JsonValueKind.Object
+            ? ReadNotification(n)
+            : new HeroSignalNotification();
+        return (eventId, notification);
+    }
+
+    /// <summary>İzin olayı: <c>{"permission":true}</c>.</summary>
+    public static bool ParsePermission(string json)
+    {
+        using var doc = Parse(json);
+        return Bool(doc.RootElement, "permission");
+    }
+
+    /// <summary>In-app yaşam döngüsü: <c>{"phase":"willDisplay","messageId":"…","json":"…"}</c>.</summary>
+    public static (InAppLifecyclePhase Phase, InAppMessage Message) ParseInAppLifecycle(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        var phase = Str(root, "phase") switch
+        {
+            "willDisplay" => InAppLifecyclePhase.WillDisplay,
+            "didDisplay" => InAppLifecyclePhase.DidDisplay,
+            "willDismiss" => InAppLifecyclePhase.WillDismiss,
+            "didDismiss" => InAppLifecyclePhase.DidDismiss,
+            _ => throw Invalid("phase"),
+        };
+        return (phase, new InAppMessage(Str(root, "messageId") ?? throw Invalid("messageId"), Str(root, "json")));
+    }
+
+    /// <summary>Sayı yanıtı: <c>{"count":3}</c> (bildirim kutusu sayaçları).</summary>
+    public static int ParseCount(string json)
+    {
+        using var doc = Parse(json);
+        return doc.RootElement.TryGetProperty("count", out var c) && c.ValueKind == JsonValueKind.Number && c.TryGetInt32(out var n)
+            ? n
+            : throw Invalid("count");
+    }
+
+    /// <summary>iOS köprüsü <c>startWithAppId:optionsJson:</c> yapılandırması (boş iOS alanları yazılmaz).</summary>
+    public static string OptionsJson(HeroSignalOptions options)
+    {
+        using var stream = new MemoryStream();
+        using (var w = new Utf8JsonWriter(stream))
+        {
+            w.WriteStartObject();
+            w.WriteString("apiUrl", options.ApiUrl);
+            w.WriteBoolean("requiresPrivacyConsent", options.RequiresPrivacyConsent);
+            w.WriteNumber("logLevel", (int)options.LogLevel);
+            if (options.IosAppGroup is { Length: > 0 } group) w.WriteString("appGroup", group);
+            if (options.IosApnsEnvironment is { Length: > 0 } env) w.WriteString("apnsEnvironment", env);
+            w.WriteBoolean("provisionalAuthorization", options.IosProvisionalAuthorization);
+            w.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    }
+
     public static string ToJson(IReadOnlyDictionary<string, string> map) => JsonSerializer.Serialize(map, BridgeJsonContext.Default.IReadOnlyDictionaryStringString);
 
     public static string ToJson(IReadOnlyList<string> list) => JsonSerializer.Serialize(list, BridgeJsonContext.Default.IReadOnlyListString);
@@ -105,6 +181,8 @@ internal static class BridgeJson
             Url = Str(e, "url"),
             DeliveryId = Str(e, "deliveryId"),
             MessageId = Str(e, "messageId"),
+            NotificationId = Str(e, "notificationId"),
+            Group = Str(e, "group"),
             Actions = actions,
             Data = e.TryGetProperty("data", out var data) ? ReadStringMap(data) : EmptyStringMap.Instance,
         };

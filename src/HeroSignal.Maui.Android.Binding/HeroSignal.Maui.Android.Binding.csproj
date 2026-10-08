@@ -12,24 +12,27 @@
     <PackageId>HeroSignal.Maui.Android.Binding</PackageId>
     <Description>HeroSignal Android SDK (com.herosignal:herosignal-android) için .NET Android binding'i. Doğrudan değil, HeroSignal.Maui üzerinden kullanılır.</Description>
     <IsPackable>true</IsPackable>
+    <!-- Kotlin internal üyeleri ($herosignal_release, access$...) bilinçli olarak bağlanmaz; çözümleme raporu bunları "$" türü olarak listeler. -->
+    <NoWarn>$(NoWarn);BG8605;BG8606</NoWarn>
+    <!-- Gradle ara çıktıları (classes.jar, R.jar) varsayılan Android öğe globlarına girmesin; yalnızca AAR bağlanır. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);build/**</DefaultItemExcludes>
     <HeroSignalNativeDir>$(MSBuildProjectDirectory)\build\native</HeroSignalNativeDir>
+    <HeroSignalAndroidAarProvided Condition="'$(HeroSignalAndroidAar)' != ''">true</HeroSignalAndroidAarProvided>
     <HeroSignalAndroidAar Condition="'$(HeroSignalAndroidAar)' == ''">$(HeroSignalNativeDir)\gradle\herosignal\outputs\aar\herosignal-release.aar</HeroSignalAndroidAar>
     <HeroSignalAndroidSdkDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\..\android'))</HeroSignalAndroidSdkDir>
     <HeroSignalGradleInitScript>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\tools\herosignal-native-out.init.gradle'))</HeroSignalGradleInitScript>
   </PropertyGroup>
 
-  <ItemGroup>
-    <TransformFile Include="Transforms\Metadata.xml" />
-  </ItemGroup>
+  <!-- Transforms\*.xml (Metadata.xml) .NET binding projelerinde varsayılan olarak TransformFile öğesidir. -->
 
   <ItemGroup>
     <!-- Yerel SDK'nın Maven bağımlılıklarının .NET karşılıkları (sdk/android/herosignal/build.gradle.kts). -->
     <PackageReference Include="Xamarin.Kotlin.StdLib" Version="2.0.21.4" />
     <PackageReference Include="Xamarin.KotlinX.Coroutines.Android" Version="1.9.0.4" />
-    <PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.15.0.2" />
+    <PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.16.0.2" />
     <PackageReference Include="Xamarin.AndroidX.Work.Work.Runtime.Ktx" Version="2.10.0.5" />
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.Process" Version="2.8.7.4" />
-    <PackageReference Include="Xamarin.Firebase.Messaging" Version="124.1.2" />
+    <PackageReference Include="Xamarin.Firebase.Messaging" Version="124.1.1.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -37,14 +40,22 @@
   </ItemGroup>
 
   <!--
-    AAR yoksa sdk/android'den üretir. Gradle çıktı (build), proje önbelleği (.gradle) ve Kotlin oturum klasörü
-    (.kotlin) bu projenin build/native klasörüne yönlendirilir. Gereken ortam: JAVA_HOME (JDK 17) ve
-    ANDROID_HOME (ya da sdk/android/local.properties içindeki sdk.dir), PATH'te gradle 8.x.
+    AAR yoksa ya da sdk/android kaynakları AAR'dan yeniyse sdk/android'den üretir (artımlı: Inputs/Outputs).
+    Gradle çıktı (build), proje önbelleği (.gradle) ve Kotlin oturum klasörü (.kotlin) bu projenin build/native
+    klasörüne yönlendirilir. Gereken ortam: JAVA_HOME (JDK 17) ve ANDROID_HOME (ya da sdk/android/local.properties
+    içindeki sdk.dir), PATH'te gradle 8.x. -p:HeroSignalAndroidAar=<yol> verilirse hazır AAR kullanılır, üretim atlanır.
   -->
-  <Target Name="HeroSignalBuildNativeAar" BeforeTargets="PrepareForBuild;_ResolveLibraryProjectImports;CollectPackageReferences" Condition="!Exists('$(HeroSignalAndroidAar)')">
+  <ItemGroup Condition="'$(HeroSignalAndroidAarProvided)' != 'true'">
+    <HeroSignalNativeSource Include="$(HeroSignalAndroidSdkDir)\herosignal\src\main\**\*" />
+    <HeroSignalNativeSource Include="$(HeroSignalAndroidSdkDir)\herosignal\build.gradle.kts;$(HeroSignalAndroidSdkDir)\build.gradle.kts;$(HeroSignalAndroidSdkDir)\settings.gradle.kts;$(HeroSignalAndroidSdkDir)\gradle.properties" />
+  </ItemGroup>
+
+  <Target Name="HeroSignalBuildNativeAar" BeforeTargets="PrepareForBuild;_ResolveLibraryProjectImports;CollectPackageReferences" Condition="'$(HeroSignalAndroidAarProvided)' != 'true'" Inputs="@(HeroSignalNativeSource)" Outputs="$(HeroSignalAndroidAar)">
     <Message Importance="high" Text="HeroSignal: yerel Android AAR üretiliyor ($(HeroSignalAndroidSdkDir))" />
-    <Exec Command="gradle -p &quot;$(HeroSignalAndroidSdkDir)&quot; --project-cache-dir &quot;$(HeroSignalNativeDir)\.gradle-project&quot; -I &quot;$(HeroSignalGradleInitScript)&quot; -PherosignalOutDir=&quot;$(HeroSignalNativeDir)\gradle&quot; -Pkotlin.project.persistent.dir=&quot;$(HeroSignalNativeDir)\.kotlin&quot; :herosignal:assembleRelease --console=plain -q" />
+    <Exec Command="gradle -p &quot;$(HeroSignalAndroidSdkDir)&quot; --project-cache-dir &quot;$(HeroSignalNativeDir)\.gradle-project&quot; -I &quot;$(HeroSignalGradleInitScript)&quot; -PherosignalOutDir=&quot;$(HeroSignalNativeDir)\gradle&quot; -Pkotlin.project.persistent.dir=&quot;$(HeroSignalNativeDir)\.kotlin&quot; :herosignal:assembleRelease --console=plain -q" EnvironmentVariables="ANDROID_HOME=$(AndroidSdkDirectory)" />
     <Error Condition="!Exists('$(HeroSignalAndroidAar)')" Text="HeroSignal: AAR üretilemedi: $(HeroSignalAndroidAar)" />
+    <!-- Gradle çıktı dosyasını yeniden yazmadıysa (değişiklik yok) zaman damgası güncellenir; sonraki derleme atlanır. -->
+    <Touch Files="$(HeroSignalAndroidAar)" />
   </Target>
 
   <Target Name="HeroSignalCleanNativeAar" AfterTargets="Clean">

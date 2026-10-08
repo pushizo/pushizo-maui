@@ -1,4 +1,44 @@
 <metadata>
   <!-- Java paketi → .NET ad alanı. -->
   <attr path="/api/package[@name='com.herosignal.sdk']" name="managedName">HeroSignalSdk.Native.Android</attr>
+
+  <!--
+    Kotlin nesne/enum alanlarının .NET adları sabitlenir: bağlama üreteci büyük harfe çevirmede derleme makinesinin
+    kültürünü kullanır (tr-TR'de "instance" → "İnstance"); ad, derleyen makineden bağımsız olmalı.
+  -->
+  <attr path="/api/package[@name='com.herosignal.sdk']/class/field[@name='INSTANCE']" name="managedName">Instance</attr>
+  <attr path="/api/package[@name='com.herosignal.sdk']/class[@name='HsLog.Level']/field[@name='NONE']" name="managedName">None</attr>
+  <attr path="/api/package[@name='com.herosignal.sdk']/class[@name='HsLog.Level']/field[@name='ERROR']" name="managedName">Error</attr>
+  <attr path="/api/package[@name='com.herosignal.sdk']/class[@name='HsLog.Level']/field[@name='WARN']" name="managedName">Warn</attr>
+  <attr path="/api/package[@name='com.herosignal.sdk']/class[@name='HsLog.Level']/field[@name='INFO']" name="managedName">Info</attr>
+  <attr path="/api/package[@name='com.herosignal.sdk']/class[@name='HsLog.Level']/field[@name='DEBUG']" name="managedName">Debug</attr>
+
+  <!--
+    Yalnızca HeroSignal.Maui'nin kullandığı genel yüzey bağlanır. Manifest bileşenleri (servis, alıcılar, aktivite,
+    WorkManager işçisi) Java tarafında çalışmaya devam eder; .NET'ten çağrılmadıkları için bağlanmaz. In-app çizim
+    modeli (tetik/blok/aksiyon) ve özel çizim katmanı yerel SDK'da kalır (varsayılan Dialog çizimi kullanılır).
+  -->
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='FlushWorker']" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'HeroSignalMessagingService')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'NotificationDismissedReceiver')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'NotificationOpenActivity')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'NotificationOpenedReceiver')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'HsInAppAction')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'HsInAppBlock')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'HsInAppTrigger')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'HsInAppLayout')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[starts-with(@name, 'HsInAppCause')]" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='HsInAppDisplay']" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='HsInAppHandle']" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='HsInAppModelsKt']" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/interface[@name='HsInAppRenderer']" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='HeroSignal.InAppMessages']/method[@name='setRenderer']" />
+
+  <!-- In-app mesajı köprüde yalnızca kimlik ve ham JSON olarak taşınır. -->
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='HsInAppMessage']/constructor" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='HsInAppMessage']/method[@name!='getId' and @name!='toJson']" />
+
+  <!-- Kotlin companion nesneleri yalnızca iç sabitler içerir; .NET'te iç içe tür adı çakışması üretir. -->
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='HsNotification.Companion']" />
+  <remove-node path="/api/package[@name='com.herosignal.sdk']/class[@name='HsNotification']/field[@name='Companion']" />
 </metadata>

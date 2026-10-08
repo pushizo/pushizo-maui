@@ -18,4 +18,14 @@
     <!-- iOS hedefi yalnızca macOS'ta (Xcode + maui-ios iş yükü) ya da açıkça istendiğinde derlenir. -->
     <HeroSignalIncludeIos Condition="'$(HeroSignalIncludeIos)' == '' and $([MSBuild]::IsOSPlatform('osx'))">true</HeroSignalIncludeIos>
   </PropertyGroup>
+
+  <!--
+    Android SDK konumu: açıkça verilmediyse ANDROID_HOME, ANDROID_SDK_ROOT, ardından Android Studio'nun varsayılan
+    Windows konumu (%LOCALAPPDATA%\Android\Sdk). Binding projesindeki Gradle çağrısı da aynı konumu kullanır.
+  -->
+  <PropertyGroup Condition="'$(AndroidSdkDirectory)' == ''">
+    <AndroidSdkDirectory Condition="'$(ANDROID_HOME)' != '' and Exists('$(ANDROID_HOME)')">$(ANDROID_HOME)</AndroidSdkDirectory>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and '$(ANDROID_SDK_ROOT)' != '' and Exists('$(ANDROID_SDK_ROOT)')">$(ANDROID_SDK_ROOT)</AndroidSdkDirectory>
+    <AndroidSdkDirectory Condition="'$(AndroidSdkDirectory)' == '' and '$(LOCALAPPDATA)' != '' and Exists('$(LOCALAPPDATA)\Android\Sdk')">$(LOCALAPPDATA)\Android\Sdk</AndroidSdkDirectory>
+  </PropertyGroup>
 </Project>

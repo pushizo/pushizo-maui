@@ -10,17 +10,21 @@ internal static partial class Validation
 {
     public const int MaxAliasesPerRequest = 20;
 
-    [GeneratedRegex("^[^\s@\"(),:;<>\[\\\]]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)+$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^[^\s@""(),:;<>\[\\\]]+@[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)+$", RegexOptions.CultureInvariant)]
     private static partial Regex EmailRegex();
 
-    [GeneratedRegex("^\+[1-9][0-9]{6,14}$", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"^\+[1-9][0-9]{6,14}$", RegexOptions.CultureInvariant)]
     private static partial Regex E164Regex();
 
-    [GeneratedRegex("[\s().-]", RegexOptions.CultureInvariant)]
+    [GeneratedRegex(@"[\s().-]", RegexOptions.CultureInvariant)]
     private static partial Regex PhoneSeparatorsRegex();
 
     [GeneratedRegex("^[a-z0-9_]{1,50}$", RegexOptions.CultureInvariant)]
     private static partial Regex AliasLabelRegex();
+
+    /// <summary>Sunucu <c>eventItemSchema.name</c> kuralı (<c>apps/api/src/identity/identity.dto.ts</c>).</summary>
+    [GeneratedRegex("^[a-zA-Z0-9_.:-]{1,100}$", RegexOptions.CultureInvariant)]
+    private static partial Regex EventNameRegex();
 
     private static readonly HashSet<string> ReservedAliases = new(StringComparer.Ordinal) { "external_id", "hs_id" };
 
@@ -111,6 +115,16 @@ internal static partial class Validation
         var list = keys.ToList();
         if (list.Any(string.IsNullOrWhiteSpace)) throw new ArgumentException("Anahtarlar boş olamaz.", paramName);
         return list;
+    }
+
+    /// <summary>Olay adı: kırpılır; 1-100 karakter, harf/rakam/<c>_ . : -</c>.</summary>
+    public static string RequireEventName(string name, string paramName)
+    {
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Olay adı gerekli.", paramName);
+        var trimmed = name.Trim();
+        if (!EventNameRegex().IsMatch(trimmed))
+            throw new ArgumentException("Olay adı 1-100 karakter olmalı; harf, rakam, _ . : - içerebilir.", paramName);
+        return trimmed;
     }
 
     public static void RequireInboxLimit(int limit, string paramName)

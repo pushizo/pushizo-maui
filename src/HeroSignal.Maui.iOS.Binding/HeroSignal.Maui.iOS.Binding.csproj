@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    HeroSignal iOS SDK'sının (sdk/ios, Swift) .NET iOS binding'i. Swift API'si doğrudan bağlanamadığından
+    native/ altındaki Objective-C ABI köprüleri (HSMauiBridge, HSMauiNotificationService) XCFramework olarak
+    bağlanır. XCFramework'ler derleme sırasında native/build-xcframeworks.sh ile build/xcframeworks altına üretilir
+    (macOS + Xcode gerekir). Hazır XCFramework klasörü için: -p:HeroSignalXcframeworksDir=<klasör>.
+    Bu proje yalnızca macOS'ta (maui-ios iş yükü) derlenir; Windows'ta HeroSignal.Maui iOS hedefini atlar.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net9.0-ios</TargetFramework>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <IsBindingProject>true</IsBindingProject>
+    <RootNamespace>HeroSignalSdk.Native.iOS</RootNamespace>
+    <AssemblyName>HeroSignal.Maui.iOS.Binding</AssemblyName>
+    <PackageId>HeroSignal.Maui.iOS.Binding</PackageId>
+    <Description>HeroSignal iOS SDK için .NET iOS binding'i (Objective-C köprüsü). Doğrudan değil, HeroSignal.Maui üzerinden kullanılır.</Description>
+    <IsPackable>true</IsPackable>
+    <!-- XCFramework'ler paketin içinde ayrı dosya olarak taşınır (derleme bütünleştirme yerine). -->
+    <NoBindingEmbedding>true</NoBindingEmbedding>
+    <DefaultItemExcludes>$(DefaultItemExcludes);build/**;native/**</DefaultItemExcludes>
+    <HeroSignalXcframeworksProvided Condition="'$(HeroSignalXcframeworksDir)' != ''">true</HeroSignalXcframeworksProvided>
+    <HeroSignalXcframeworksDir Condition="'$(HeroSignalXcframeworksDir)' == ''">$(MSBuildProjectDirectory)/build/xcframeworks</HeroSignalXcframeworksDir>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ObjcBindingApiDefinition Include="ApiDefinition.cs" />
+    <ObjcBindingCoreSource Include="StructsAndEnums.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <NativeReference Include="$(HeroSignalXcframeworksDir)/HeroSignalMauiBridge.xcframework">
+      <Kind>Framework</Kind>
+      <SmartLink>false</SmartLink>
+      <Frameworks>Foundation UIKit UserNotifications</Frameworks>
+    </NativeReference>
+    <NativeReference Include="$(HeroSignalXcframeworksDir)/HeroSignalMauiNotificationService.xcframework">
+      <Kind>Framework</Kind>
+      <SmartLink>false</SmartLink>
+      <Frameworks>Foundation UserNotifications</Frameworks>
+    </NativeReference>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(HeroSignalXcframeworksProvided)' != 'true'">
+    <HeroSignalIosNativeSource Include="native/Package.swift;native/Sources/**/*.swift;../../../ios/Package.swift;../../../ios/Sources/**/*.swift" />
+  </ItemGroup>
+
+  <!-- XCFramework'ler yoksa veya köprü/SDK kaynakları daha yeniyse yeniden üretilir (artımlı). -->
+  <Target Name="HeroSignalBuildXcframeworks" BeforeTargets="PrepareForBuild;ResolveNativeReferences" Condition="'$(HeroSignalXcframeworksProvided)' != 'true'" Inputs="@(HeroSignalIosNativeSource)" Outputs="$(HeroSignalXcframeworksDir)/HeroSignalMauiBridge.xcframework/Info.plist;$(HeroSignalXcframeworksDir)/HeroSignalMauiNotificationService.xcframework/Info.plist">
+    <Error Condition="!$([MSBuild]::IsOSPlatform('osx'))" Text="HeroSignal: iOS köprüleri yalnızca macOS'ta (Xcode) üretilebilir. Hazır XCFramework için -p:HeroSignalXcframeworksDir=&lt;klasör&gt; verin." />
+    <Message Importance="high" Text="HeroSignal: iOS köprü XCFramework'leri üretiliyor" />
+    <Exec Command="bash &quot;$(MSBuildProjectDirectory)/native/build-xcframeworks.sh&quot; &quot;$(HeroSignalXcframeworksDir)&quot;" />
+  </Target>
+
+  <Target Name="HeroSignalCleanXcframeworks" AfterTargets="Clean" Condition="'$(HeroSignalXcframeworksProvided)' != 'true'">
+    <RemoveDir Directories="$(MSBuildProjectDirectory)/build" />
+  </Target>
+</Project>
