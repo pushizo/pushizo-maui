@@ -34,10 +34,10 @@
     <!-- Yerel SDK'nın Maven bağımlılıklarının .NET karşılıkları (sdk/android/herosignal/build.gradle.kts). -->
     <PackageReference Include="Xamarin.Kotlin.StdLib" Version="2.0.21.4" />
     <PackageReference Include="Xamarin.KotlinX.Coroutines.Android" Version="1.9.0.4" />
-    <PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.15.0.2" />
+    <PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.16.0.2" />
     <PackageReference Include="Xamarin.AndroidX.Work.Work.Runtime.Ktx" Version="2.10.0.5" />
     <PackageReference Include="Xamarin.AndroidX.Lifecycle.Process" Version="2.8.7.4" />
-    <PackageReference Include="Xamarin.Firebase.Messaging" Version="124.1.2" />
+    <PackageReference Include="Xamarin.Firebase.Messaging" Version="124.1.1.2" />
   </ItemGroup>
 
   <ItemGroup>
@@ -52,7 +52,13 @@
   -->
   <Target Name="HeroSignalBuildNativeAar" BeforeTargets="PrepareForBuild;_ResolveLibraryProjectImports;CollectPackageReferences" Condition="!Exists('$(HeroSignalAndroidAar)') or !Exists('$(HeroSignalBridgeAar)')">
     <Message Importance="high" Text="HeroSignal: yerel Android AAR'ları üretiliyor ($(HeroSignalNativeProjectDir))" />
-    <Exec Command="gradle -p &quot;$(HeroSignalNativeProjectDir)&quot; --project-cache-dir &quot;$(HeroSignalNativeDir)\.gradle-project&quot; -I &quot;$(HeroSignalGradleInitScript)&quot; -PherosignalOutDir=&quot;$(HeroSignalNativeDir)\gradle&quot; -Pkotlin.project.persistent.dir=&quot;$(HeroSignalNativeDir)\.kotlin&quot; :herosignal:assembleRelease :herosignal-maui-bridge:assembleRelease --console=plain -q" />
+    <PropertyGroup>
+      <!-- ANDROID_HOME tanımlı değilse MAUI'nin çözdüğü ya da varsayılan konumdaki Android SDK Gradle'a iletilir. -->
+      <HeroSignalGradleAndroidHome Condition="'$(HeroSignalGradleAndroidHome)' == ''">$(ANDROID_HOME)</HeroSignalGradleAndroidHome>
+      <HeroSignalGradleAndroidHome Condition="'$(HeroSignalGradleAndroidHome)' == ''">$(AndroidSdkDirectory)</HeroSignalGradleAndroidHome>
+      <HeroSignalGradleAndroidHome Condition="'$(HeroSignalGradleAndroidHome)' == '' and Exists('$(LocalAppData)\Android\Sdk')">$(LocalAppData)\Android\Sdk</HeroSignalGradleAndroidHome>
+    </PropertyGroup>
+    <Exec Command="gradle -p &quot;$(HeroSignalNativeProjectDir)&quot; --project-cache-dir &quot;$(HeroSignalNativeDir)\.gradle-project&quot; -I &quot;$(HeroSignalGradleInitScript)&quot; -PherosignalOutDir=&quot;$(HeroSignalNativeDir)\gradle&quot; -Pkotlin.project.persistent.dir=&quot;$(HeroSignalNativeDir)\.kotlin&quot; :herosignal:assembleRelease :herosignal-maui-bridge:assembleRelease --console=plain -q" EnvironmentVariables="ANDROID_HOME=$(HeroSignalGradleAndroidHome)" />
     <Error Condition="!Exists('$(HeroSignalAndroidAar)')" Text="HeroSignal: AAR üretilemedi: $(HeroSignalAndroidAar)" />
     <Error Condition="!Exists('$(HeroSignalBridgeAar)')" Text="HeroSignal: köprü AAR'ı üretilemedi: $(HeroSignalBridgeAar)" />
   </Target>
