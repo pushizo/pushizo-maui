@@ -42,6 +42,8 @@ internal interface IHeroSignalPlatform
     bool NotificationPermission { get; }
     Task<bool> RequestPermissionAsync(bool fallbackToSettings);
     void ClearAllNotifications();
+    void RemoveNotification(string id);
+    void RemoveGroupedNotifications(string group);
 
     // In-app
     void AddTriggers(IReadOnlyDictionary<string, string> triggers);

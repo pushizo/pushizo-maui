@@ -26,6 +26,10 @@ public sealed record HeroSignalNotification
     public IReadOnlyList<NotificationAction> Actions { get; init; } = Array.Empty<NotificationAction>();
     /// <summary>Müşteri verileri (<c>hs_</c> önekli alanlar hariç).</summary>
     public IReadOnlyDictionary<string, string> Data { get; init; } = EmptyStringMap.Instance;
+    /// <summary>
+    /// Yalnızca Android: tepsi kimliği (<see cref="NotificationsManager.RemoveNotification(int)"/> için); iOS'ta null.
+    /// </summary>
+    public int? AndroidNotificationId { get; init; }
 }
 
 /// <summary>Push aboneliği durumu.</summary>

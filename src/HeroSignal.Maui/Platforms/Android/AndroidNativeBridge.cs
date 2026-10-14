@@ -64,6 +64,16 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public void ClearAllNotifications() => HeroSignalMauiBridge.ClearAllNotifications();
 
+    public void RemoveNotification(string id)
+    {
+        // Android tepsi kimliği tamsayıdır; iOS biçimindeki metin kimliğin burada karşılığı yoktur.
+        if (!int.TryParse(id, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out var androidNotificationId))
+            throw new ArgumentException("Android bildirim kimliği tamsayı olmalı (HeroSignalNotification.AndroidNotificationId).", nameof(id));
+        HeroSignalMauiBridge.RemoveNotification(androidNotificationId);
+    }
+
+    public void RemoveGroupedNotifications(string group) => HeroSignalMauiBridge.RemoveGroupedNotifications(group);
+
     public void AddTriggers(string triggersJson) => HeroSignalMauiBridge.AddTriggers(triggersJson);
 
     public void RemoveTriggers(string keysJson) => HeroSignalMauiBridge.RemoveTriggers(keysJson);

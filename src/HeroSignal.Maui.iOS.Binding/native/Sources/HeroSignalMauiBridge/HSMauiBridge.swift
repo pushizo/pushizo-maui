@@ -205,6 +205,14 @@ public final class HSMauiBridge: NSObject {
     @objc(clearAllNotifications)
     public static func clearAllNotifications() { HeroSignal.Notifications.clearAll() }
 
+    /// Tek bildirimi istek kimliğiyle (`UNNotificationRequest.identifier`) bildirim merkezinden kaldırır.
+    @objc(removeNotification:)
+    public static func removeNotification(_ identifier: String) { HeroSignal.Notifications.removeNotification(identifier: identifier) }
+
+    /// Aynı `thread-id`'ye sahip bildirimleri bildirim merkezinden kaldırır.
+    @objc(removeGroupedNotifications:)
+    public static func removeGroupedNotifications(_ group: String) { HeroSignal.Notifications.removeGroupedNotifications(group) }
+
     // MARK: In-app (SDK in-app durumu ana iş parçacığında tutulur)
 
     @objc(addTriggers:)
