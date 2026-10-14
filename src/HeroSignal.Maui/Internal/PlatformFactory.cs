@@ -77,6 +77,8 @@ internal sealed class UnsupportedPlatform : IHeroSignalPlatform
     }
 
     public void ClearAllNotifications() => Ignored(nameof(ClearAllNotifications));
+    public void RemoveNotification(string id) => Ignored(nameof(RemoveNotification));
+    public void RemoveGroupedNotifications(string group) => Ignored(nameof(RemoveGroupedNotifications));
     public void AddTriggers(IReadOnlyDictionary<string, string> triggers) => Ignored(nameof(AddTriggers));
     public void RemoveTriggers(IReadOnlyList<string> keys) => Ignored(nameof(RemoveTriggers));
     public void ClearTriggers() => Ignored(nameof(ClearTriggers));

@@ -246,6 +246,10 @@ internal static class BridgeJson
             MessageId = Str(e, "messageId"),
             Actions = actions,
             Data = e.TryGetProperty("data", out var data) ? ReadStringMap(data) : EmptyStringMap.Instance,
+            AndroidNotificationId = e.TryGetProperty("androidNotificationId", out var trayId) && trayId.ValueKind == JsonValueKind.Number
+                && trayId.TryGetInt32(out var androidNotificationId)
+                ? androidNotificationId
+                : null,
         };
     }
 

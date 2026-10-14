@@ -279,6 +279,18 @@ object HeroSignalMauiBridge {
         HeroSignal.Notifications.clearAll()
     }
 
+    /** Tek bir HeroSignal bildirimini tepsi kimliğiyle (`androidNotificationId`) kaldırır. */
+    @JvmStatic
+    fun removeNotification(androidNotificationId: Int) {
+        HeroSignal.Notifications.removeNotification(androidNotificationId)
+    }
+
+    /** Aynı grup anahtarına (`android_group`) sahip bildirimleri ve grup özetini kaldırır. */
+    @JvmStatic
+    fun removeGroupedNotifications(group: String) {
+        HeroSignal.Notifications.removeGroupedNotifications(group)
+    }
+
     @JvmStatic fun addTriggers(triggersJson: String) = HeroSignal.InAppMessages.addTriggers(stringMap(JSONObject(triggersJson)))
 
     @JvmStatic fun removeTriggers(keysJson: String) = HeroSignal.InAppMessages.removeTriggers(stringList(JSONArray(keysJson)))
@@ -410,6 +422,7 @@ object HeroSignalMauiBridge {
             .put("messageId", nullable(n.messageId))
             .put("actions", actions)
             .put("data", JSONObject(n.data))
+            .put("androidNotificationId", n.androidNotificationId)
     }
 
     private fun subscriptionJson(s: HsPushSubscriptionState): JSONObject = JSONObject()

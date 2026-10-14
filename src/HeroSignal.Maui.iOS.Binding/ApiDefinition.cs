@@ -131,6 +131,14 @@ namespace HeroSignalSdk.Native.iOS
         void ClearAllNotifications ();
 
         [Static]
+        [Export ("removeNotification:")]
+        void RemoveNotification (string identifier);
+
+        [Static]
+        [Export ("removeGroupedNotifications:")]
+        void RemoveGroupedNotifications (string group);
+
+        [Static]
         [Export ("addTriggers:")]
         void AddTriggers (string triggersJson);
 

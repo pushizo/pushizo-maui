@@ -103,6 +103,10 @@ internal sealed class BridgePlatform : IHeroSignalPlatform
 
     public void ClearAllNotifications() => _bridge.ClearAllNotifications();
 
+    public void RemoveNotification(string id) => _bridge.RemoveNotification(id);
+
+    public void RemoveGroupedNotifications(string group) => _bridge.RemoveGroupedNotifications(group);
+
     public void AddTriggers(IReadOnlyDictionary<string, string> triggers) => _bridge.AddTriggers(BridgeJson.ToJson(triggers));
 
     public void RemoveTriggers(IReadOnlyList<string> keys) => _bridge.RemoveTriggers(BridgeJson.ToJson(keys));

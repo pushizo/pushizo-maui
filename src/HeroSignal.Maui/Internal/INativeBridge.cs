@@ -64,6 +64,14 @@ internal interface INativeBridge
 
     void ClearAllNotifications();
 
+    /// <summary>
+    /// Tek bildirimi kaldırır. Android: tepsi kimliği (tamsayı metni); iOS: <c>UNNotificationRequest.identifier</c>.
+    /// </summary>
+    void RemoveNotification(string id);
+
+    /// <summary>Android <c>android_group</c> / iOS <c>thread-id</c> grubundaki bildirimleri kaldırır.</summary>
+    void RemoveGroupedNotifications(string group);
+
     void AddTriggers(string triggersJson);
     void RemoveTriggers(string keysJson);
     void ClearTriggers();

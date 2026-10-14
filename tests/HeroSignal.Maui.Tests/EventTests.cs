@@ -173,4 +173,33 @@ public sealed class EventTests : HeroSignalTestBase
         HeroSignal.Notifications.ClearAll();
         Assert.Equal("clearAll", Bridge.Calls[^1]);
     }
+
+    [Fact]
+    public void Remove_notification_and_group_are_forwarded_to_bridge()
+    {
+        InitializeSdk();
+        HeroSignal.Notifications.RemoveNotification(-42);
+        HeroSignal.Notifications.RemoveNotification(" ios-request-1 ");
+        HeroSignal.Notifications.RemoveGroupedNotifications("orders");
+        Assert.Equal(new[] { "removeNotification:-42", "removeNotification:ios-request-1", "removeGrouped:orders" }, Bridge.Calls);
+
+        Assert.Throws<ArgumentException>(() => HeroSignal.Notifications.RemoveNotification(" "));
+        Assert.Throws<ArgumentException>(() => HeroSignal.Notifications.RemoveGroupedNotifications(""));
+        Assert.Throws<ArgumentNullException>(() => HeroSignal.Notifications.RemoveGroupedNotifications(null!));
+        Assert.Equal(3, Bridge.Calls.Count);
+    }
+
+    [Fact]
+    public void Android_notification_id_is_parsed_when_present()
+    {
+        InitializeSdk();
+        NotificationClickedEventArgs? received = null;
+        HeroSignal.Notifications.Clicked += (_, e) => received = e;
+
+        Bridge.Emit("click", """{"notification":{"title":"T","data":{},"androidNotificationId":12345},"actionId":null,"url":null}""");
+        Assert.Equal(12345, received!.Notification.AndroidNotificationId);
+
+        Bridge.Emit("click", $$"""{"notification":{{Notification}},"actionId":null,"url":null}""");
+        Assert.Null(received!.Notification.AndroidNotificationId);
+    }
 }

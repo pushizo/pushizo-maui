@@ -82,6 +82,8 @@ internal sealed class FakeNativeBridge : INativeBridge
     }
 
     public void ClearAllNotifications() => Record("clearAll");
+    public void RemoveNotification(string id) => Record($"removeNotification:{id}");
+    public void RemoveGroupedNotifications(string group) => Record($"removeGrouped:{group}");
     public void AddTriggers(string triggersJson) => Record($"addTriggers:{triggersJson}");
     public void RemoveTriggers(string keysJson) => Record($"removeTriggers:{keysJson}");
     public void ClearTriggers() => Record("clearTriggers");

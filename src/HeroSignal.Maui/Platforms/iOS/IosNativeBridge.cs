@@ -62,6 +62,10 @@ internal sealed class IosNativeBridge : INativeBridge
 
     public void ClearAllNotifications() => HSMauiBridge.ClearAllNotifications();
 
+    public void RemoveNotification(string id) => HSMauiBridge.RemoveNotification(id);
+
+    public void RemoveGroupedNotifications(string group) => HSMauiBridge.RemoveGroupedNotifications(group);
+
     public void AddTriggers(string triggersJson) => HSMauiBridge.AddTriggers(triggersJson);
 
     public void RemoveTriggers(string keysJson) => HSMauiBridge.RemoveTriggers(keysJson);

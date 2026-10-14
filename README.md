@@ -100,6 +100,8 @@ await HeroSignal.Inbox.ArchiveAsync(page.Items[0].Id);
 
 HeroSignal.Session.SendEvent("purchase", new Dictionary<string, object?> { ["sku"] = "A1" }, value: 129.9);
 HeroSignal.Notifications.ClearAll();
+HeroSignal.Notifications.RemoveGroupedNotifications("orders");  // Android android_group / iOS thread-id
+HeroSignal.Notifications.RemoveNotification(42);                // Android tepsi kimliği; iOS'ta RemoveNotification("istek-kimligi")
 HeroSignal.Debug.SetLogLevel(LogLevel.Debug);
 HeroSignal.Logout();
 ```
