@@ -14,8 +14,8 @@
     <Authors>HeroSignal</Authors>
     <Company>HeroSignal</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/herosignal/herosignal</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/herosignal/herosignal</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/exec0de/herosignal</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/exec0de/herosignal</RepositoryUrl>
     <PackageTags>herosignal;push;notifications;in-app;inbox;maui;android;ios</PackageTags>
     <!-- iOS hedefi yalnızca macOS'ta (Xcode + maui-ios iş yükü) ya da açıkça istendiğinde derlenir. -->
     <HeroSignalIncludeIos Condition="'$(HeroSignalIncludeIos)' == '' and $([MSBuild]::IsOSPlatform('osx'))">true</HeroSignalIncludeIos>
