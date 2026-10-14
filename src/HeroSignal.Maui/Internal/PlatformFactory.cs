@@ -17,7 +17,7 @@ internal static class PlatformFactory
 
 /// <summary>
 /// Yerel HeroSignal SDK'sı olmayan hedefler (Windows, MacCatalyst, platformdan bağımsız net8.0): yazma çağrıları
-/// etkisizdir ve bir kez uyarı günlüğe yazılır; okuma çağrıları boş değer, bildirim kutusu
+/// etkisizdir ve bir kez uyarı günlüğe yazılır; okuma çağrıları boş değer, bildirim kutusu ve tercihler
 /// <see cref="HeroSignalException.PlatformNotSupported"/> döndürür.
 /// </summary>
 internal sealed class UnsupportedPlatform : IHeroSignalPlatform
@@ -34,8 +34,8 @@ internal sealed class UnsupportedPlatform : IHeroSignalPlatform
             SdkLog.Write(LogLevel.Debug, $"{operation}: bu platformda etkisiz");
     }
 
-    private static Task<T> NotSupported<T>() =>
-        Task.FromException<T>(new HeroSignalException(HeroSignalException.PlatformNotSupported, "Bildirim kutusu yalnızca Android ve iOS'ta kullanılabilir."));
+    private static Task<T> NotSupported<T>(string feature = "Bildirim kutusu") =>
+        Task.FromException<T>(new HeroSignalException(HeroSignalException.PlatformNotSupported, $"{feature} yalnızca Android ve iOS'ta kullanılabilir."));
 
     public void Initialize(string appId, HeroSignalOptions options, IHeroSignalEventSink sink)
     {
@@ -63,6 +63,8 @@ internal sealed class UnsupportedPlatform : IHeroSignalPlatform
     public void RemoveSms(string phoneNumber) => Ignored(nameof(RemoveSms));
     public IReadOnlyList<string> Emails => Array.Empty<string>();
     public IReadOnlyList<string> SmsNumbers => Array.Empty<string>();
+    public Task<UserPreferences> GetPreferencesAsync() => NotSupported<UserPreferences>("Tercihler");
+    public Task<UserPreferences> SetPreferencesAsync(IReadOnlyList<PreferenceInput> preferences) => NotSupported<UserPreferences>("Tercihler");
     public PushSubscriptionState PushSubscription => PushSubscriptionState.Empty;
     public void OptIn() => Ignored(nameof(OptIn));
     public void OptOut() => Ignored(nameof(OptOut));

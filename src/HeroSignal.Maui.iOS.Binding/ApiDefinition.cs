@@ -179,6 +179,14 @@ namespace HeroSignalSdk.Native.iOS
         void InboxUnreadCount (HSMauiResultHandler completion);
 
         [Static]
+        [Export ("getPreferencesWithCompletion:")]
+        void GetPreferences (HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("setPreferences:completion:")]
+        void SetPreferences (string preferencesJson, HSMauiResultHandler completion);
+
+        [Static]
         [Export ("sendEvent:propertiesJson:value:hasValue:")]
         void SendEvent (string name, string propertiesJson, double value, bool hasValue);
 

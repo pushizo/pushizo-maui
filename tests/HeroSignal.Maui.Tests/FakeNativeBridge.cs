@@ -29,6 +29,9 @@ internal sealed class FakeNativeBridge : INativeBridge
     /// <summary>Bildirim kutusu yanıtı: (json, hata kodu, hata mesajı).</summary>
     public (string? Json, string? Code, string? Message) InboxResponse { get; set; } = ("{}", null, null);
 
+    /// <summary>Tercih yanıtı: (json, hata kodu, hata mesajı).</summary>
+    public (string? Json, string? Code, string? Message) PreferencesResponse { get; set; } = ("""{"preferences":[],"categories":[]}""", null, null);
+
     public (string Name, string PropertiesJson, double Value, bool HasValue)? LastEvent { get; private set; }
 
     /// <summary>Yerel olay üretir (köprünün olay dinleyicisini eşzamanlı çağırır).</summary>
@@ -92,10 +95,12 @@ internal sealed class FakeNativeBridge : INativeBridge
         Paused = paused;
     }
 
-    private void Respond(string call, NativeResult result)
+    private void Respond(string call, NativeResult result) => Respond(call, InboxResponse, result);
+
+    private void Respond(string call, (string? Json, string? Code, string? Message) response, NativeResult result)
     {
         Record(call);
-        var (json, code, message) = InboxResponse;
+        var (json, code, message) = response;
         ThreadPool.QueueUserWorkItem(_ => result(json, code, message));
     }
 
@@ -104,6 +109,8 @@ internal sealed class FakeNativeBridge : INativeBridge
     public void InboxMarkAllRead(NativeResult result) => Respond("inboxMarkAllRead", result);
     public void InboxArchive(string id, NativeResult result) => Respond($"inboxArchive:{id}", result);
     public void InboxUnreadCount(NativeResult result) => Respond("inboxUnreadCount", result);
+    public void GetPreferences(NativeResult result) => Respond("getPreferences", PreferencesResponse, result);
+    public void SetPreferences(string preferencesJson, NativeResult result) => Respond($"setPreferences:{preferencesJson}", PreferencesResponse, result);
 
     public void SendEvent(string name, string propertiesJson, double value, bool hasValue)
     {

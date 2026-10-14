@@ -2,7 +2,7 @@ using HeroSignalSdk.Maui.Internal;
 
 namespace HeroSignalSdk.Maui;
 
-/// <summary>Kullanıcı: tag, alias, dil, e-posta/SMS abonelikleri ve push aboneliği (<c>HeroSignal.User</c>).</summary>
+/// <summary>Kullanıcı: tag, alias, dil, e-posta/SMS abonelikleri, bildirim tercihleri ve push aboneliği (<c>HeroSignal.User</c>).</summary>
 public sealed class UserManager
 {
     internal UserManager()
@@ -78,6 +78,19 @@ public sealed class UserManager
 
     /// <summary>SMS aboneliğini siler.</summary>
     public void RemoveSms(string phoneNumber) => HeroSignal.Platform().RemoveSms(Validation.RequirePhone(phoneNumber, nameof(phoneNumber)));
+
+    /// <summary>
+    /// Kullanıcının kategori/kanal tercihleri ve app'in mesaj kategorileri (ADR-0019 §4). Abonelik kaydı tamamlanmadan
+    /// <see cref="HeroSignalException"/> (<c>NOT_READY</c>); sunucu hataları sunucu kodunu taşır.
+    /// </summary>
+    public Task<UserPreferences> GetPreferencesAsync() => HeroSignal.Platform().GetPreferencesAsync();
+
+    /// <summary>
+    /// Tercihleri yazar (1-100 kayıt; <see cref="PreferenceInput.Channel"/> null = tüm kanallar) ve güncel listeyi döndürür.
+    /// Geçersiz girdide <see cref="ArgumentException"/>.
+    /// </summary>
+    public Task<UserPreferences> SetPreferencesAsync(IEnumerable<PreferenceInput> preferences) =>
+        HeroSignal.Platform().SetPreferencesAsync(Validation.RequirePreferences(preferences, nameof(preferences)));
 }
 
 /// <summary>Push aboneliği (<c>HeroSignal.User.PushSubscription</c>).</summary>
