@@ -93,6 +93,12 @@ internal sealed class AndroidNativeBridge : INativeBridge
     public void InboxUnreadCount(NativeResult result) =>
         HeroSignalMauiBridge.InboxUnreadCount(new ResultCallback(result));
 
+    public void GetPreferences(NativeResult result) =>
+        HeroSignalMauiBridge.GetPreferences(new ResultCallback(result));
+
+    public void SetPreferences(string preferencesJson, NativeResult result) =>
+        HeroSignalMauiBridge.SetPreferences(preferencesJson, new ResultCallback(result));
+
     public void SendEvent(string name, string propertiesJson, double value, bool hasValue) =>
         HeroSignalMauiBridge.SendEvent(name, propertiesJson, value, hasValue);
 

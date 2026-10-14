@@ -117,4 +117,27 @@ internal static partial class Validation
     {
         if (limit is < 1 or > 200) throw new ArgumentOutOfRangeException(paramName, limit, "limit 1-200 olmalı.");
     }
+
+    public const int MaxPreferencesPerRequest = 100;
+
+    /// <summary>Tercih kanalları (ADR-0019 §4; yerel SDK'lardaki <c>HsPreferencesParser</c> ile aynı küme).</summary>
+    private static readonly HashSet<string> PreferenceChannels = new(StringComparer.Ordinal) { "ios_push", "android_push", "web_push", "email", "sms" };
+
+    /// <summary>Tercih girdileri: 1-100 kayıt, kategori 1-64 karakter (boşluktan ibaret olamaz), kanal null veya bilinen bir anahtar.</summary>
+    public static IReadOnlyList<PreferenceInput> RequirePreferences(IEnumerable<PreferenceInput> preferences, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(preferences, paramName);
+        var list = preferences.ToList();
+        if (list.Count is < 1 or > MaxPreferencesPerRequest)
+            throw new ArgumentException($"1-{MaxPreferencesPerRequest} tercih verilmeli.", paramName);
+        foreach (var p in list)
+        {
+            if (p is null) throw new ArgumentException("Tercih null olamaz.", paramName);
+            if (string.IsNullOrWhiteSpace(p.Category) || p.Category.Length > 64)
+                throw new ArgumentException("Kategori anahtarı 1-64 karakter olmalı.", paramName);
+            if (p.Channel is not null && !PreferenceChannels.Contains(p.Channel))
+                throw new ArgumentException($"Geçersiz kanal: {p.Channel} (ios_push, android_push, web_push, email, sms ya da null).", paramName);
+        }
+        return list;
+    }
 }

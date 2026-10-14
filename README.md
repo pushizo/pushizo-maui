@@ -1,6 +1,6 @@
 # HeroSignal .NET MAUI SDK (`HeroSignal.Maui`)
 
-Push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias ve e-posta/SMS abonelikleri için .NET MAUI
+Push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, bildirim tercihleri ve e-posta/SMS abonelikleri için .NET MAUI
 SDK'sı. Yerel HeroSignal Android (`com.herosignal:herosignal-android`) ve iOS (`HeroSignal` Swift) SDK'larını sarar;
 tetik değerlendirme, çevrimdışı kuyruk, teslimat geri bildirimi ve in-app çizimi yerel SDK'dadır. API yüzeyi
 plan 06 §6.1 (eski sağlayıcı v5 ile uyumlu) ve Flutter eklentisiyle aynıdır.
@@ -9,7 +9,7 @@ plan 06 §6.1 (eski sağlayıcı v5 ile uyumlu) ve Flutter eklentisiyle aynıdı
 |-------|----------|
 | `net8.0-android`, `net9.0-android` | Yerel Android SDK'sı (minSdk 23) |
 | `net8.0-ios`, `net9.0-ios` | Yerel iOS SDK'sı (iOS 15+) |
-| Diğerleri (Windows, MacCatalyst) | Çağrılar etkisizdir, bir kez uyarı yazılır; bildirim kutusu `PLATFORM_NOT_SUPPORTED` döndürür |
+| Diğerleri (Windows, MacCatalyst) | Çağrılar etkisizdir, bir kez uyarı yazılır; bildirim kutusu ve tercihler `PLATFORM_NOT_SUPPORTED` döndürür |
 
 ## Kurulum
 
@@ -71,6 +71,15 @@ HeroSignal.User.SetLanguage("tr");
 HeroSignal.User.AddEmail("ali@example.com");
 HeroSignal.User.AddSms("+905321234567");
 
+// Bildirim tercihleri (ADR-0019 §4): kategori × kanal (Channel null = tüm kanallar)
+var prefs = await HeroSignal.User.GetPreferencesAsync();
+foreach (var category in prefs.Categories) Console.WriteLine(category.LocalizedName("tr"));
+await HeroSignal.User.SetPreferencesAsync(new[]
+{
+    new PreferenceInput("promo", OptedIn: false),
+    new PreferenceInput("news", OptedIn: true, Channel: "email"),
+});
+
 HeroSignal.User.PushSubscription.Changed += (_, e) => Console.WriteLine(e.Current.Id);
 HeroSignal.Notifications.PermissionChanged += (_, e) => Console.WriteLine(e.Permission); // yerel izin gözlemcisinden
 HeroSignal.Notifications.Clicked += (_, e) => Navigate(e.Url);
@@ -96,8 +105,10 @@ HeroSignal.Logout();
 ```
 
 Olaylar yerel SDK'nın iş parçacığında tetiklenir; arayüz güncellemesi için `MainThread.BeginInvokeOnMainThread`
-kullanın. Bildirim kutusu hataları `HeroSignalException.Code` ile gelir (`NOT_READY`: abonelik/kullanıcı kaydı henüz
-tamamlanmadı; diğerleri sunucu hata kodu).
+kullanın. Bildirim kutusu ve tercih hataları `HeroSignalException.Code` ile gelir (`NOT_READY`: abonelik/kullanıcı kaydı
+henüz tamamlanmadı; `INVALID_ARGUMENT`: yerel SDK girdiyi reddetti; diğerleri sunucu hata kodu). `SetPreferencesAsync`
+girdiyi köprüden önce doğrular (1-100 kayıt, kategori 1-64 karakter, kanal `ios_push` | `android_push` | `web_push` |
+`email` | `sms` ya da null); geçersizse `ArgumentException`.
 
 ## Mimari
 

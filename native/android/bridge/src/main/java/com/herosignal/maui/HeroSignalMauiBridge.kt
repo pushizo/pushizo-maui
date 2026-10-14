@@ -21,7 +21,11 @@ import com.herosignal.sdk.HsInAppLifecycleListener
 import com.herosignal.sdk.HsInboxItem
 import com.herosignal.sdk.HsInboxPage
 import com.herosignal.sdk.HsLog
+import com.herosignal.sdk.HsMessageCategory
 import com.herosignal.sdk.HsNotification
+import com.herosignal.sdk.HsPreference
+import com.herosignal.sdk.HsPreferenceInput
+import com.herosignal.sdk.HsPreferencesResult
 import com.herosignal.sdk.HsPushSubscriptionState
 import org.json.JSONArray
 import org.json.JSONObject
@@ -311,6 +315,26 @@ object HeroSignalMauiBridge {
     fun inboxUnreadCount(result: HeroSignalMauiResult) =
         HeroSignal.Inbox.unreadCount(reply<Int>(result) { JSONObject().put("unreadCount", it).toString() })
 
+    // --- Tercihler (ADR-0019 §4) ---
+
+    /** Başarı JSON'u: `{"preferences":[…],"categories":[…]}` (bkz. `preferencesResultJson`). */
+    @JvmStatic
+    fun getPreferences(result: HeroSignalMauiResult) =
+        HeroSignal.User.getPreferences(reply<HsPreferencesResult>(result) { preferencesResultJson(it).toString() })
+
+    /**
+     * `preferencesJson`: `[{"category","channel":null|"…","optedIn"}]`; doğrulama yerel SDK'dadır (geçersizse
+     * `INVALID_ARGUMENT`). Başarı JSON'u `getPreferences` ile aynıdır (güncel liste).
+     */
+    @JvmStatic
+    fun setPreferences(preferencesJson: String, result: HeroSignalMauiResult) {
+        val inputs = runCatching { preferenceInputs(JSONArray(preferencesJson)) }.getOrElse {
+            result.onResult(null, "INVALID_ARGUMENT", it.message ?: "Geçersiz tercih listesi")
+            return
+        }
+        HeroSignal.User.setPreferences(inputs, reply<HsPreferencesResult>(result) { preferencesResultJson(it).toString() })
+    }
+
     /** `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez. */
     @JvmStatic
     fun sendEvent(name: String, propertiesJson: String, value: Double, hasValue: Boolean) =
@@ -407,6 +431,38 @@ object HeroSignalMauiBridge {
         .put("archivedAt", nullable(i.archivedAt))
         .put("expiresAt", nullable(i.expiresAt))
         .put("createdAt", nullable(i.createdAt))
+
+    private fun preferenceInputs(a: JSONArray): List<HsPreferenceInput> = (0 until a.length()).map { i ->
+        val o = a.getJSONObject(i)
+        HsPreferenceInput(
+            category = o.getString("category"),
+            channel = if (o.isNull("channel")) null else o.getString("channel"),
+            optedIn = o.getBoolean("optedIn"),
+        )
+    }
+
+    private fun preferenceJson(p: HsPreference): JSONObject = JSONObject()
+        .put("category", p.category)
+        .put("channel", nullable(p.channel))
+        .put("optedIn", p.optedIn)
+        .put("explicit", p.explicit)
+        .put("source", nullable(p.source))
+        .put("updatedAt", nullable(p.updatedAt))
+
+    private fun categoryJson(c: HsMessageCategory): JSONObject = JSONObject()
+        .put("key", c.key)
+        .put("name", JSONObject(c.name))
+        .put("description", JSONObject(c.description))
+        .put("channels", c.channels?.let { JSONArray(it) } ?: JSONObject.NULL)
+        .put("defaultOptedIn", c.defaultOptedIn)
+
+    private fun preferencesResultJson(r: HsPreferencesResult): JSONObject {
+        val preferences = JSONArray()
+        r.preferences.forEach { preferences.put(preferenceJson(it)) }
+        val categories = JSONArray()
+        r.categories.forEach { categories.put(categoryJson(it)) }
+        return JSONObject().put("preferences", preferences).put("categories", categories)
+    }
 
     private fun pageJson(p: HsInboxPage): JSONObject {
         val items = JSONArray()

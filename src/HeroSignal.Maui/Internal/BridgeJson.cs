@@ -123,6 +123,77 @@ internal static class BridgeJson
             : throw Invalid("unreadCount");
     }
 
+    /// <summary>
+    /// <c>{"preferences":[…],"categories":[…]}</c> (<see cref="INativeBridge.GetPreferences"/>). Kategorisiz tercih
+    /// <see cref="HeroSignalException.InvalidResponse"/> verir; anahtarsız kategori atlanır (yerel SDK'larla aynı).
+    /// </summary>
+    public static UserPreferences ParsePreferences(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw Invalid("preferences");
+        var preferences = new List<UserPreference>();
+        if (root.TryGetProperty("preferences", out var prefs) && prefs.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var e in prefs.EnumerateArray())
+            {
+                if (e.ValueKind != JsonValueKind.Object) continue;
+                preferences.Add(new UserPreference
+                {
+                    Category = Str(e, "category") ?? throw Invalid("category"),
+                    Channel = Str(e, "channel"),
+                    OptedIn = Bool(e, "optedIn"),
+                    Explicit = Bool(e, "explicit"),
+                    Source = Str(e, "source"),
+                    UpdatedAt = Millis(e, "updatedAt"),
+                });
+            }
+        }
+        var categories = new List<PreferenceCategory>();
+        if (root.TryGetProperty("categories", out var cats) && cats.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var e in cats.EnumerateArray())
+            {
+                if (e.ValueKind != JsonValueKind.Object) continue;
+                var key = Str(e, "key");
+                if (string.IsNullOrEmpty(key)) continue;
+                categories.Add(new PreferenceCategory
+                {
+                    Key = key,
+                    Name = e.TryGetProperty("name", out var name) ? ReadStringMap(name) : EmptyStringMap.Instance,
+                    Description = e.TryGetProperty("description", out var description) ? ReadStringMap(description) : EmptyStringMap.Instance,
+                    Channels = e.TryGetProperty("channels", out var channels) && channels.ValueKind == JsonValueKind.Array
+                        ? channels.EnumerateArray().Where(c => c.ValueKind == JsonValueKind.String).Select(c => c.GetString()!).Where(c => c.Length > 0).ToList()
+                        : null,
+                    // Alan yoksa varsayılan açık (yerel SDK'lardaki `default_opted_in` varsayılanı).
+                    DefaultOptedIn = !(e.TryGetProperty("defaultOptedIn", out var d) && d.ValueKind == JsonValueKind.False),
+                });
+            }
+        }
+        return new UserPreferences(preferences, categories);
+    }
+
+    /// <summary>Tercih girdileri → <c>[{"category","channel","optedIn"}]</c> (kanal yoksa JSON null).</summary>
+    public static string PreferencesToJson(IReadOnlyList<PreferenceInput> preferences)
+    {
+        using var stream = new MemoryStream();
+        using (var w = new Utf8JsonWriter(stream))
+        {
+            w.WriteStartArray();
+            foreach (var p in preferences)
+            {
+                w.WriteStartObject();
+                w.WriteString("category", p.Category);
+                if (p.Channel is null) w.WriteNull("channel");
+                else w.WriteString("channel", p.Channel);
+                w.WriteBoolean("optedIn", p.OptedIn);
+                w.WriteEndObject();
+            }
+            w.WriteEndArray();
+        }
+        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    }
+
     /// <summary>Yerel köprünün başlatma seçenekleri (<c>HeroSignalMauiBridge.start</c> / <c>HSMauiBridge.start</c>).</summary>
     public static string OptionsToJson(HeroSignalOptions options)
     {

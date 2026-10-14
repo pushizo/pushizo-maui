@@ -70,6 +70,15 @@ internal sealed class BridgePlatform : IHeroSignalPlatform
 
     public IReadOnlyList<string> SmsNumbers => BridgeJson.ParseStringList(_bridge.GetSmsNumbers());
 
+    public Task<UserPreferences> GetPreferencesAsync() =>
+        Call(r => _bridge.GetPreferences(r), json => BridgeJson.ParsePreferences(Require(json)));
+
+    public Task<UserPreferences> SetPreferencesAsync(IReadOnlyList<PreferenceInput> preferences)
+    {
+        var json = BridgeJson.PreferencesToJson(preferences);
+        return Call(r => _bridge.SetPreferences(json, r), result => BridgeJson.ParsePreferences(Require(result)));
+    }
+
     public PushSubscriptionState PushSubscription => BridgeJson.ParseSubscriptionState(_bridge.GetPushSubscription());
 
     public void OptIn() => _bridge.OptIn();

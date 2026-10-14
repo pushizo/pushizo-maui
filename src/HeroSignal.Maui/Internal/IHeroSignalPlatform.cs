@@ -30,6 +30,8 @@ internal interface IHeroSignalPlatform
     void RemoveSms(string phoneNumber);
     IReadOnlyList<string> Emails { get; }
     IReadOnlyList<string> SmsNumbers { get; }
+    Task<UserPreferences> GetPreferencesAsync();
+    Task<UserPreferences> SetPreferencesAsync(IReadOnlyList<PreferenceInput> preferences);
 
     // Push aboneliği
     PushSubscriptionState PushSubscription { get; }

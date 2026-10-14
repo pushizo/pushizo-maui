@@ -276,6 +276,28 @@ public final class HSMauiBridge: NSObject {
         }
     }
 
+    // MARK: Tercihler (ADR-0019 §4)
+
+    /// Başarı JSON'u: `{"preferences":[…],"categories":[…]}` (bkz. `preferencesResultJson`).
+    @objc(getPreferencesWithCompletion:)
+    public static func getPreferences(completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let result = try await HeroSignal.User.getPreferences()
+            return jsonString(preferencesResultJson(result))
+        }
+    }
+
+    /// `preferencesJson`: `[{"category","channel":null|"…","optedIn"}]`; doğrulama yerel SDK'dadır (geçersizse
+    /// `INVALID_ARGUMENT`). Başarı JSON'u `getPreferences` ile aynıdır (güncel liste).
+    @objc(setPreferences:completion:)
+    public static func setPreferences(_ preferencesJson: String, completion: @escaping (String?, String?, String?) -> Void) {
+        let inputs = preferenceInputs(preferencesJson)
+        inbox(completion) {
+            let result: HSPreferencesResult = try await HeroSignal.User.setPreferences(inputs)
+            return jsonString(preferencesResultJson(result))
+        }
+    }
+
     // MARK: Oturum
 
     /// `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez.
@@ -454,6 +476,39 @@ public final class HSMauiBridge: NSObject {
             "expiresAt": millis(item.expiresAt),
             "createdAt": millis(item.createdAt),
         ]
+    }
+
+    /// Geçersiz öğeler (kategorisi metin olmayan) boş kategoriyle iletilir; yerel SDK doğrulaması reddeder.
+    private static func preferenceInputs(_ json: String) -> [HSPreferenceInput] {
+        ((jsonObject(json) as? [Any]) ?? []).map { element in
+            let o = element as? [String: Any] ?? [:]
+            return HSPreferenceInput(category: o["category"] as? String ?? "", channel: o["channel"] as? String, optedIn: o["optedIn"] as? Bool ?? false)
+        }
+    }
+
+    private static func preferenceJson(_ p: HSPreference) -> [String: Any] {
+        [
+            "category": p.category,
+            "channel": p.channel ?? NSNull(),
+            "optedIn": p.optedIn,
+            "explicit": p.explicit,
+            "source": p.source ?? NSNull(),
+            "updatedAt": millis(p.updatedAt),
+        ]
+    }
+
+    private static func categoryJson(_ c: HSMessageCategory) -> [String: Any] {
+        [
+            "key": c.key,
+            "name": c.name,
+            "description": c.description,
+            "channels": c.channels ?? NSNull(),
+            "defaultOptedIn": c.defaultOptedIn,
+        ]
+    }
+
+    private static func preferencesResultJson(_ r: HSPreferencesResult) -> [String: Any] {
+        ["preferences": r.preferences.map { preferenceJson($0) }, "categories": r.categories.map { categoryJson($0) }]
     }
 
     private static func pageJson(_ page: HSInboxPage) -> [String: Any] {
