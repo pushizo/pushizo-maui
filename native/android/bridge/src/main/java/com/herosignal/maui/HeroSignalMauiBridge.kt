@@ -160,7 +160,23 @@ object HeroSignalMauiBridge {
 
     @JvmStatic fun setConsentGiven(given: Boolean) = HeroSignal.setConsentGiven(given)
 
-    @JvmStatic fun login(externalId: String, identityHash: String?) = HeroSignal.login(externalId, identityHash)
+    /** Kanıt app'in kimlik doğrulama kipine uymuyorsa hata mesajı döner (giriş yapılmaz); başarıda null. */
+    @JvmStatic fun login(externalId: String, identityHash: String?, jwt: String?): String? = identityError {
+        HeroSignal.login(externalId, identityHash, jwt)
+    }
+
+    /** Kimlik JWT'sini yeniler; giriş yapılmamışsa hata mesajı döner, başarıda null. */
+    @JvmStatic fun updateUserJwt(jwt: String): String? = identityError { HeroSignal.updateUserJwt(jwt) }
+
+    /** Yerel SDK'nın kimlik doğrulama hatalarını .NET tarafına mesaj olarak taşır (Java istisnası köprüden sızmaz). */
+    private inline fun identityError(block: () -> Unit): String? = try {
+        block()
+        null
+    } catch (e: IllegalStateException) {
+        e.message ?: "kimlik doğrulama hatası"
+    } catch (e: IllegalArgumentException) {
+        e.message ?: "geçersiz kimlik kanıtı"
+    }
 
     @JvmStatic fun logout() = HeroSignal.logout()
 

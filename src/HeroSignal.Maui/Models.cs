@@ -117,6 +117,8 @@ public sealed class HeroSignalException : Exception
     public const string PlatformNotSupported = "PLATFORM_NOT_SUPPORTED";
     public const string InvalidResponse = "INVALID_RESPONSE";
     public const string InvalidArgument = "INVALID_ARGUMENT";
+    /// <summary>iOS Live Activity başlatılamadı (Live Activities kapalı, <c>NSSupportsLiveActivities</c> yok vb.).</summary>
+    public const string LiveActivityFailed = "LIVE_ACTIVITY_FAILED";
 
     public HeroSignalException(string code, string message, Exception? innerException = null)
         : base(message, innerException)

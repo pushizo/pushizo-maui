@@ -14,7 +14,9 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public void SetConsentGiven(bool given) => HeroSignalMauiBridge.SetConsentGiven(given);
 
-    public void Login(string externalId, string? identityHash) => HeroSignalMauiBridge.Login(externalId, identityHash);
+    public string? Login(string externalId, string? identityHash, string? jwt) => HeroSignalMauiBridge.Login(externalId, identityHash, jwt);
+
+    public string? UpdateUserJwt(string jwt) => HeroSignalMauiBridge.UpdateUserJwt(jwt);
 
     public void Logout() => HeroSignalMauiBridge.Logout();
 
@@ -111,6 +113,17 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public void SendEvent(string name, string propertiesJson, double value, bool hasValue) =>
         HeroSignalMauiBridge.SendEvent(name, propertiesJson, value, hasValue);
+
+    /// <summary>Live Activities iOS'a özgüdür; Android'de çağrılar köprüye ulaşmadan <c>PLATFORM_NOT_SUPPORTED</c> olur.</summary>
+    public bool SupportsLiveActivities => false;
+
+    public void SetupDefaultLiveActivity(NativeResult result) => LiveActivitiesNotSupported(result);
+
+    public void StartDefaultLiveActivity(string activityId, string attributesJson, string contentStateJson, NativeResult result) =>
+        LiveActivitiesNotSupported(result);
+
+    private static void LiveActivitiesNotSupported(NativeResult result) =>
+        result(null, HeroSignalException.PlatformNotSupported, UnsupportedPlatform.LiveActivitiesUnsupportedMessage);
 
     public void ForegroundPreventDefault(string eventId) => HeroSignalMauiBridge.ForegroundPreventDefault(eventId);
 

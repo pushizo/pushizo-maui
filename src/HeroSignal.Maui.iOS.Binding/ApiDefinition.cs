@@ -37,8 +37,14 @@ namespace HeroSignalSdk.Native.iOS
         void SetConsentGiven (bool given);
 
         [Static]
-        [Export ("loginWithExternalId:identityHash:")]
-        void Login (string externalId, [NullAllowed] string identityHash);
+        [Export ("loginWithExternalId:identityHash:jwt:")]
+        [return: NullAllowed]
+        string Login (string externalId, [NullAllowed] string identityHash, [NullAllowed] string jwt);
+
+        [Static]
+        [Export ("updateUserJwt:")]
+        [return: NullAllowed]
+        string UpdateUserJwt (string jwt);
 
         [Static]
         [Export ("logout")]
@@ -197,6 +203,14 @@ namespace HeroSignalSdk.Native.iOS
         [Static]
         [Export ("sendEvent:propertiesJson:value:hasValue:")]
         void SendEvent (string name, string propertiesJson, double value, bool hasValue);
+
+        [Static]
+        [Export ("setupDefaultLiveActivityWithCompletion:")]
+        void SetupDefaultLiveActivity (HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("startDefaultLiveActivity:attributesJson:contentStateJson:completion:")]
+        void StartDefaultLiveActivity (string activityId, string attributesJson, string contentStateJson, HSMauiResultHandler completion);
 
         [Static]
         [Export ("foregroundPreventDefault:")]

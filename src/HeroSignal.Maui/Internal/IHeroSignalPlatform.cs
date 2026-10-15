@@ -11,7 +11,8 @@ internal interface IHeroSignalPlatform
 
     void Initialize(string appId, HeroSignalOptions options, IHeroSignalEventSink sink);
     void SetConsentGiven(bool given);
-    void Login(string externalId, string? identityHash);
+    void Login(string externalId, string? identityHash, string? jwt);
+    void UpdateUserJwt(string jwt);
     void Logout();
     void SetLogLevel(LogLevel level);
 
@@ -62,6 +63,10 @@ internal interface IHeroSignalPlatform
 
     // Oturum
     void SendEvent(string name, Dictionary<string, object?> properties, double? value);
+
+    // Live Activities (yalnızca iOS; girdiler doğrulanmış ve normalize edilmiştir: değerler string, long, double, bool)
+    Task SetupDefaultLiveActivityAsync();
+    Task StartDefaultLiveActivityAsync(string activityId, IReadOnlyDictionary<string, object> attributes, IReadOnlyDictionary<string, object> contentState);
 }
 
 /// <summary>Yerel SDK olaylarının ortak katmana iletimi (herhangi bir iş parçacığından çağrılabilir).</summary>

@@ -109,6 +109,29 @@ public sealed class InitializationTests : HeroSignalTestBase
     }
 
     [Fact]
+    public void Jwt_identity_verification_reaches_bridge_and_surfaces_errors()
+    {
+        InitializeSdk();
+        HeroSignal.Login("user_42", jwt: "a.b.c");
+        HeroSignal.Login("user_43", "hash_abc", "a.b.c");
+        HeroSignal.Login("user_44", jwt: " ");
+        HeroSignal.UpdateUserJwt("d.e.f");
+
+        Assert.Equal(
+            new[] { "login:user_42:<null>:jwt=a.b.c", "login:user_43:hash_abc:jwt=a.b.c", "login:user_44:<null>", "updateUserJwt:d.e.f" },
+            Bridge.Calls);
+        Assert.Throws<ArgumentException>(() => HeroSignal.UpdateUserJwt(""));
+
+        // Yerel SDK kanıtı app kipine uygun bulmazsa veya kullanıcı yoksa hata NOT_READY olarak yansır.
+        Bridge.LoginError = "Bu app için kimlik JWT'si zorunlu.";
+        var login = Assert.Throws<HeroSignalException>(() => HeroSignal.Login("user_45", "hash_abc"));
+        Assert.Equal(HeroSignalException.NotReady, login.Code);
+        Assert.Equal("Bu app için kimlik JWT'si zorunlu.", login.Message);
+        Bridge.UpdateUserJwtError = "Önce login ile kullanıcı kimliklendirilmeli";
+        Assert.Equal(HeroSignalException.NotReady, Assert.Throws<HeroSignalException>(() => HeroSignal.UpdateUserJwt("g.h.i")).Code);
+    }
+
+    [Fact]
     public void Unsupported_platform_is_a_safe_no_op()
     {
         HeroSignal.ResetForTests(new UnsupportedPlatform());
@@ -116,6 +139,7 @@ public sealed class InitializationTests : HeroSignalTestBase
 
         Assert.False(HeroSignal.IsSupported);
         HeroSignal.Login("user_1");
+        HeroSignal.UpdateUserJwt("a.b.c");
         HeroSignal.User.AddTag("plan", "pro");
         HeroSignal.InAppMessages.AddTrigger("level", "gold");
         HeroSignal.Session.SendEvent("purchase", value: 9.99);
