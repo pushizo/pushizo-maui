@@ -15,7 +15,9 @@ namespace HeroSignalSdk.Maui;
 /// </summary>
 public static class HeroSignalAndroid
 {
-    /// <summary>Bildirim izni isteğinin sonucunu yerel SDK'ya iletir (HeroSignal dışı istek kodları yok sayılır).</summary>
+    /// <summary>
+    /// Bildirim ve konum izni isteklerinin sonucunu yerel SDK'ya iletir (HeroSignal dışı istek kodları yok sayılır).
+    /// </summary>
     public static void OnRequestPermissionsResult(int requestCode)
     {
         if (!HeroSignal.IsInitialized) return;

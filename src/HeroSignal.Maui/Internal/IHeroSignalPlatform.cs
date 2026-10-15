@@ -67,6 +67,13 @@ internal interface IHeroSignalPlatform
     // Live Activities (yalnızca iOS; girdiler doğrulanmış ve normalize edilmiştir: değerler string, long, double, bool)
     Task SetupDefaultLiveActivityAsync();
     Task StartDefaultLiveActivityAsync(string activityId, IReadOnlyDictionary<string, object> attributes, IReadOnlyDictionary<string, object> contentState);
+
+    // Konum paylaşımı (v2 Faz 17b; yalnızca ön plan, gönderim yerel SDK'da)
+    bool LocationShared { get; }
+    void SetLocationShared(bool shared);
+
+    /// <summary><paramref name="rationale"/> boş değilse kırpılmıştır; null ise yerel SDK'nın varsayılan metni kullanılır.</summary>
+    Task<bool> RequestLocationPermissionAsync(string? rationale);
 }
 
 /// <summary>Yerel SDK olaylarının ortak katmana iletimi (herhangi bir iş parçacığından çağrılabilir).</summary>

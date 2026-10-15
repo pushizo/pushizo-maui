@@ -132,6 +132,18 @@ internal interface INativeBridge
     /// </summary>
     void StartDefaultLiveActivity(string activityId, string attributesJson, string contentStateJson, NativeResult result);
 
+    /// <summary>Konum paylaşımı açık mı (yerel SDK'daki kalıcı tercih; izin durumundan bağımsız).</summary>
+    bool GetLocationShared();
+
+    /// <summary>Konum paylaşımını açar/kapatır; kapatınca yerel SDK sunucuya <c>location: null</c> gönderir.</summary>
+    void SetLocationShared(bool shared);
+
+    /// <summary>
+    /// "Kullanırken" konum iznini ister: izin yoksa önce açıklama diyaloğu (<paramref name="rationale"/>, null ise yerel
+    /// SDK'nın tr/en varsayılan metni), ardından sistem istemi. <paramref name="completion"/> güncel izin durumuyla bir kez çağrılır.
+    /// </summary>
+    void RequestLocationPermission(string? rationale, Action<bool> completion);
+
     /// <summary>Ön plan olayının (<c>foreground</c> olayındaki <c>eventId</c>) yerel gösterimini engeller.</summary>
     void ForegroundPreventDefault(string eventId);
 

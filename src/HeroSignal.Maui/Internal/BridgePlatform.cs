@@ -96,19 +96,8 @@ internal sealed class BridgePlatform : IHeroSignalPlatform
 
     public bool NotificationPermission => _bridge.GetPermission();
 
-    public Task<bool> RequestPermissionAsync(bool fallbackToSettings)
-    {
-        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-        try
-        {
-            _bridge.RequestPermission(fallbackToSettings, granted => tcs.TrySetResult(granted));
-        }
-        catch (Exception e)
-        {
-            tcs.TrySetException(e);
-        }
-        return tcs.Task;
-    }
+    public Task<bool> RequestPermissionAsync(bool fallbackToSettings) =>
+        AskPermission(completion => _bridge.RequestPermission(fallbackToSettings, completion));
 
     public void ClearAllNotifications() => _bridge.ClearAllNotifications();
 
@@ -161,6 +150,28 @@ internal sealed class BridgePlatform : IHeroSignalPlatform
         var attributesJson = BridgeJson.LiveActivityValuesToJson(attributes);
         var contentStateJson = BridgeJson.LiveActivityValuesToJson(contentState);
         return Call<object?>(r => _bridge.StartDefaultLiveActivity(activityId, attributesJson, contentStateJson, r), _ => null);
+    }
+
+    public bool LocationShared => _bridge.GetLocationShared();
+
+    public void SetLocationShared(bool shared) => _bridge.SetLocationShared(shared);
+
+    public Task<bool> RequestLocationPermissionAsync(string? rationale) =>
+        AskPermission(completion => _bridge.RequestLocationPermission(rationale, completion));
+
+    /// <summary>Yerel izin geri çağrısını (herhangi bir iş parçacığından, bir kez) Task'a çevirir.</summary>
+    private static Task<bool> AskPermission(Action<Action<bool>> invoke)
+    {
+        var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        try
+        {
+            invoke(granted => tcs.TrySetResult(granted));
+        }
+        catch (Exception e)
+        {
+            tcs.TrySetException(e);
+        }
+        return tcs.Task;
     }
 
     private static string Require(string? json) =>

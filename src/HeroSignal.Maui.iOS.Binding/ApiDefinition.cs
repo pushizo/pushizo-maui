@@ -213,6 +213,18 @@ namespace HeroSignalSdk.Native.iOS
         void StartDefaultLiveActivity (string activityId, string attributesJson, string contentStateJson, HSMauiResultHandler completion);
 
         [Static]
+        [Export ("locationShared")]
+        bool LocationShared ();
+
+        [Static]
+        [Export ("updateLocationShared:")]
+        void UpdateLocationShared (bool shared);
+
+        [Static]
+        [Export ("requestLocationPermissionWithRationale:completion:")]
+        void RequestLocationPermission ([NullAllowed] string rationale, HSMauiPermissionHandler completion);
+
+        [Static]
         [Export ("foregroundPreventDefault:")]
         void ForegroundPreventDefault (string eventId);
 

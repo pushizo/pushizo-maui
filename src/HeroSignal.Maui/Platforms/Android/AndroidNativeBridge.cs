@@ -125,6 +125,20 @@ internal sealed class AndroidNativeBridge : INativeBridge
     private static void LiveActivitiesNotSupported(NativeResult result) =>
         result(null, HeroSignalException.PlatformNotSupported, UnsupportedPlatform.LiveActivitiesUnsupportedMessage);
 
+    public bool GetLocationShared() => HeroSignalMauiBridge.LocationShared();
+
+    public void SetLocationShared(bool shared) => HeroSignalMauiBridge.UpdateLocationShared(shared);
+
+    /// <summary>
+    /// Açıklama diyaloğu ve sistem istemi Kotlin köprüsündedir; sonuç <c>OnRequestPermissionsResult</c> (istek kodu
+    /// <c>HeroSignal.Location.PERMISSION_REQUEST_CODE</c>) ya da etkinliğin ön plana dönüşüyle bildirilir.
+    /// </summary>
+    public void RequestLocationPermission(string? rationale, Action<bool> completion) =>
+        HeroSignalMauiBridge.RequestLocationPermission(
+            Microsoft.Maui.ApplicationModel.Platform.CurrentActivity,
+            rationale,
+            new PermissionCallback(completion));
+
     public void ForegroundPreventDefault(string eventId) => HeroSignalMauiBridge.ForegroundPreventDefault(eventId);
 
     public void ForegroundDisplay(string eventId) => HeroSignalMauiBridge.ForegroundDisplay(eventId);

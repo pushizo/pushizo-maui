@@ -1,6 +1,6 @@
 # HeroSignal .NET MAUI SDK (`HeroSignal.Maui`)
 
-Push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, bildirim tercihleri ve e-posta/SMS abonelikleri için .NET MAUI
+Push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, bildirim tercihleri, konum paylaşımı ve e-posta/SMS abonelikleri için .NET MAUI
 SDK'sı. Yerel HeroSignal Android (`com.herosignal:herosignal-android`) ve iOS (`HeroSignal` Swift) SDK'larını sarar;
 tetik değerlendirme, çevrimdışı kuyruk, teslimat geri bildirimi ve in-app çizimi yerel SDK'dadır. API yüzeyi
 plan 06 §6.1 (eski sağlayıcı v5 ile uyumlu) ve Flutter eklentisiyle aynıdır.
@@ -184,6 +184,43 @@ await HeroSignal.LiveActivities.StartDefaultLiveActivityAsync(
   `NSSupportsLiveActivities` eksik vb.).
 - Tip-güvenli kendi `ActivityAttributes` türünüz için native tarafta `HeroSignal.LiveActivities.register(MyAttributes.self)`
   çağırın (ayrıntı: `docs/sdk/ios.md` "Live Activities").
+
+### Konum
+
+Konum paylaşımı isteğe bağlıdır ve yalnızca ön planda çalışır (arka plan konumu istenmez). Paylaşım açıkken yerel SDK
+konumu oturum başında ve uygulama ön plana döndüğünde en sık 5 dakikada bir push aboneliğine yazar
+(`PATCH /sdk/v1/apps/{appId}/subscriptions/{id}` → `location: { lat, lng, accuracy_m }`); gönderim yerel SDK'nın kalıcı
+kuyruğuyla yapılır.
+
+```csharp
+// İzin yoksa önce açıklama diyaloğu (verilmezse SDK'nın Türkçe/İngilizce varsayılan metni), sonra sistem istemi.
+var granted = await HeroSignal.Location.RequestPermissionAsync("Yakındaki mağazaları göstermek için konumunuzu kullanırız.");
+if (granted) HeroSignal.Location.SetShared(true);   // tercih kalıcıdır
+
+bool shared = HeroSignal.Location.IsShared;          // paylaşım açık mı (izin durumundan bağımsız)
+HeroSignal.Location.SetShared(false);               // sunucuya location: null → konum ve rıza kaydı silinir
+```
+
+- `RequestPermissionAsync` izin varsa veya verildiyse `true`; reddedildi/kısıtlı, açıklamada "Şimdi değil" seçildi ya
+  da aşağıdaki yapılandırma eksikse `false` döner. İzin paylaşımı açmaz; `SetShared(true)` ayrıca çağrılır.
+- iOS: `Platforms/iOS/Info.plist` dosyasına `NSLocationWhenInUseUsageDescription` ekleyin (yoksa izin istenmez,
+  sonuç `false`). Yalnızca "Kullanırken" izni istenir.
+- Android: köprü izni otomatik eklemez; `Platforms/Android/AndroidManifest.xml` içine en az yaklaşık konumu ekleyin:
+  ```xml
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <!-- isteğe bağlı, hassas konum için: -->
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  ```
+  Manifest'te hiçbiri yoksa ya da etkin Activity yoksa sonuç `false` olur. Sistem izni yerel SDK'nın istek koduyla
+  (`HeroSignal.Location.PERMISSION_REQUEST_CODE` = `0x484C`) istenir; köprü sonucu `UseHeroSignal` yaşam döngüsü olayından
+  alır (yalnızca `HeroSignal.Initialize` kullanıyorsanız bildirim izniyle aynı `HeroSignalAndroid.OnRequestPermissionsResult`
+  çağrısı yeterlidir).
+- İzin yoksa konum sessizce gönderilmez; `RequiresPrivacyConsent` açıkken `SetConsentGiven(true)` gelene kadar hiç
+  gönderilmez.
+- KVKK: ilk gönderilen konum sunucuda açık rıza kaydı olarak saklanır. Kullanıcıya paylaşımın amacını açıklayın ve
+  kapatma seçeneği sunun; `SetShared(false)` sunucudaki konumu ve rıza kaydını hemen sildirir.
+- Windows ve MacCatalyst hedeflerinde konum çağrıları etkisizdir (bir kez uyarı yazılır): `IsShared` ve
+  `RequestPermissionAsync` `false` döner, hata fırlatılmaz.
 
 ## Mimari
 
