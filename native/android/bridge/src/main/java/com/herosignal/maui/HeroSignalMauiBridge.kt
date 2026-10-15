@@ -2,9 +2,11 @@ package com.herosignal.maui
 
 import android.Manifest
 import android.app.Activity
+import android.app.AlertDialog
 import android.app.Application
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -27,6 +29,7 @@ import com.herosignal.sdk.HsPreference
 import com.herosignal.sdk.HsPreferenceInput
 import com.herosignal.sdk.HsPreferencesResult
 import com.herosignal.sdk.HsPushSubscriptionState
+import com.herosignal.sdk.R as SdkR
 import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.ref.WeakReference
@@ -42,7 +45,7 @@ interface HeroSignalMauiResult {
     fun onResult(json: String?, errorCode: String?, errorMessage: String?)
 }
 
-/** Bildirim izni isteğinin sonucu (güncel izin durumu). */
+/** Bildirim veya konum izni isteğinin sonucu (güncel izin durumu). */
 interface HeroSignalMauiPermissionCallback {
     fun onResult(granted: Boolean)
 }
@@ -70,6 +73,16 @@ object HeroSignalMauiBridge {
     private var permissionRequestPending = false
     private var permissionFallbackToSettings = false
     private var permissionActivity: WeakReference<Activity>? = null
+
+    private val locationPermissions = listOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION)
+    private val locationLock = Any()
+    private val locationCallbacks = ArrayList<HeroSignalMauiPermissionCallback>()
+
+    /** Açıklama diyaloğu veya sistem istemi açık (yeni istekler aynı sonucu bekler). */
+    private var locationRequestActive = false
+
+    /** Sistem konum izni istendi; sonuç `onRequestPermissionsResult` ya da ön plana dönüşle bekleniyor. */
+    private var locationAwaitingResult = false
 
     private val clickListener: (HsClickEvent) -> Unit = { e ->
         emit("click", JSONObject().put("notification", notificationJson(e.notification)).put("actionId", e.actionId ?: JSONObject.NULL).put("url", e.url ?: JSONObject.NULL))
@@ -113,6 +126,7 @@ object HeroSignalMauiBridge {
     private val activityCallbacks = object : Application.ActivityLifecycleCallbacks {
         override fun onActivityResumed(activity: Activity) {
             resolvePermissionRequest()
+            resolveLocationRequest()
         }
 
         override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
@@ -245,11 +259,13 @@ object HeroSignalMauiBridge {
         HeroSignal.Notifications.requestPermission(activity)
     }
 
-    /** MAUI `OnRequestPermissionsResult` yaşam döngüsü olayından çağrılır. */
+    /** MAUI `OnRequestPermissionsResult` yaşam döngüsü olayından çağrılır (bildirim ve konum istek kodları). */
     @JvmStatic
     fun onRequestPermissionsResult(requestCode: Int) {
-        if (requestCode != HeroSignal.Notifications.PERMISSION_REQUEST_CODE) return
-        resolvePermissionRequest()
+        when (requestCode) {
+            HeroSignal.Notifications.PERMISSION_REQUEST_CODE -> resolvePermissionRequest()
+            HeroSignal.Location.PERMISSION_REQUEST_CODE -> resolveLocationRequest()
+        }
     }
 
     private fun resolvePermissionRequest() {
@@ -367,6 +383,114 @@ object HeroSignalMauiBridge {
     @JvmStatic
     fun sendEvent(name: String, propertiesJson: String, value: Double, hasValue: Boolean) =
         HeroSignal.Session.sendEvent(name, toMap(JSONObject(propertiesJson)), if (hasValue) value else null)
+
+    // --- Konum (v2 Faz 17b; yalnızca ön plan, gönderim yerel SDK'da) ---
+
+    /** Paylaşım açık mı (kalıcı tercih; izin durumundan bağımsız). */
+    @JvmStatic fun locationShared(): Boolean = HeroSignal.Location.isShared
+
+    /** Paylaşımı açar/kapatır; kapatınca sunucuya `location: null` gönderilir (konum ve rıza kaydı silinir). */
+    @JvmStatic fun updateLocationShared(shared: Boolean) = HeroSignal.Location.setShared(shared)
+
+    /**
+     * Konum iznini ister ve sonucu `callback` ile bildirir (yerel SDK'nın `Location.requestPermission`'ı sonuç döndürmediği
+     * için akış burada kurulur): izin varsa hemen true; manifest'te `ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION` yoksa
+     * veya etkin Activity yoksa false; aksi halde SDK metinleriyle açıklama diyaloğu, "Devam" ile sistem istemi
+     * (`HeroSignal.Location.PERMISSION_REQUEST_CODE`). Sonuç `onRequestPermissionsResult` ya da etkinliğin ön plana
+     * dönüşüyle gelir; `HeroSignal.Location.onPermissionResult()` çağrılır (paylaşım açıksa konum hemen gönderilir).
+     */
+    @JvmStatic
+    fun requestLocationPermission(activity: Activity?, rationale: String?, callback: HeroSignalMauiPermissionCallback) {
+        if (HeroSignal.Location.permissionGranted) {
+            HeroSignal.Location.onPermissionResult()
+            callback.onResult(true)
+            return
+        }
+        val permissions = (activity ?: appContext)?.let(::declaredLocationPermissions).orEmpty()
+        if (permissions.isEmpty()) {
+            HsLog.w("konum izni istenemedi: uygulama manifest'inde ACCESS_COARSE_LOCATION/ACCESS_FINE_LOCATION yok")
+            callback.onResult(false)
+            return
+        }
+        if (activity == null) {
+            HsLog.w("konum izni istenemedi: etkin Activity yok")
+            callback.onResult(false)
+            return
+        }
+        synchronized(locationLock) {
+            locationCallbacks.add(callback)
+            if (locationRequestActive) return
+            locationRequestActive = true
+        }
+        activity.runOnUiThread { showLocationRationale(activity, rationale, permissions) }
+    }
+
+    /** Açıklama diyaloğu (UI iş parçacığında); "Şimdi değil", geri tuşu ya da dışarı dokunma false ile sonuçlanır. */
+    private fun showLocationRationale(activity: Activity, rationale: String?, permissions: List<String>) {
+        if (activity.isFinishing || activity.isDestroyed) {
+            finishLocationRequest(false)
+            return
+        }
+        var proceed = false
+        try {
+            AlertDialog.Builder(activity)
+                .setTitle(SdkR.string.hs_location_rationale_title)
+                .setMessage(rationale?.takeIf { it.isNotBlank() } ?: activity.getString(SdkR.string.hs_location_rationale_message))
+                .setPositiveButton(SdkR.string.hs_location_rationale_continue) { _, _ -> proceed = true }
+                .setNegativeButton(SdkR.string.hs_location_rationale_not_now, null)
+                .setOnDismissListener {
+                    if (proceed) requestSystemLocationPermission(activity, permissions) else finishLocationRequest(false)
+                }
+                .show()
+        } catch (e: RuntimeException) {
+            HsLog.w("konum izni açıklaması gösterilemedi", e)
+            finishLocationRequest(false)
+        }
+    }
+
+    private fun requestSystemLocationPermission(activity: Activity, permissions: List<String>) {
+        if (activity.isFinishing || activity.isDestroyed) {
+            finishLocationRequest(false)
+            return
+        }
+        synchronized(locationLock) { locationAwaitingResult = true }
+        ActivityCompat.requestPermissions(activity, permissions.toTypedArray(), HeroSignal.Location.PERMISSION_REQUEST_CODE)
+    }
+
+    /** Sistem istemi sonucunu bekleyenlere iletir (istem açık değilse etkisiz). */
+    private fun resolveLocationRequest() {
+        val callbacks: List<HeroSignalMauiPermissionCallback>
+        synchronized(locationLock) {
+            if (!locationAwaitingResult) return
+            callbacks = takeLocationCallbacks()
+        }
+        // İzin verildiyse ve paylaşım açıksa yerel SDK konumu hemen gönderir.
+        HeroSignal.Location.onPermissionResult()
+        val granted = HeroSignal.Location.permissionGranted
+        callbacks.forEach { runCatching { it.onResult(granted) } }
+    }
+
+    private fun finishLocationRequest(granted: Boolean) {
+        val callbacks = synchronized(locationLock) { takeLocationCallbacks() }
+        callbacks.forEach { runCatching { it.onResult(granted) } }
+    }
+
+    /** `locationLock` altında çağrılır: istek durumunu sıfırlar ve bekleyen geri çağrıları devralır. */
+    private fun takeLocationCallbacks(): List<HeroSignalMauiPermissionCallback> {
+        locationRequestActive = false
+        locationAwaitingResult = false
+        val callbacks = locationCallbacks.toList()
+        locationCallbacks.clear()
+        return callbacks
+    }
+
+    /** Uygulama manifest'inde tanımlı konum izinleri (yalnızca bunlar istenebilir; köprü izin eklemez). */
+    @Suppress("DEPRECATION")
+    private fun declaredLocationPermissions(context: Context): List<String> = runCatching {
+        val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
+        val requested = info.requestedPermissions?.toSet().orEmpty()
+        locationPermissions.filter { it in requested }
+    }.getOrDefault(emptyList())
 
     @JvmStatic
     fun foregroundPreventDefault(eventId: String) {

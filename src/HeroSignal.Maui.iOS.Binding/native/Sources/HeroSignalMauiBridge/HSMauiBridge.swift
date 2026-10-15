@@ -354,6 +354,24 @@ public final class HSMauiBridge: NSObject {
         }
     }
 
+    // MARK: Konum (v2 Faz 17b; yalnızca ön plan)
+
+    /// Paylaşım açık mı (yerel SDK'daki kalıcı tercih; izin durumundan bağımsız).
+    @objc(locationShared)
+    public static func locationShared() -> Bool { HeroSignal.Location.isShared }
+
+    /// Paylaşımı açar/kapatır; kapatınca sunucuya `location: null` gönderilir (konum ve rıza kaydı silinir).
+    @objc(updateLocationShared:)
+    public static func updateLocationShared(_ shared: Bool) { HeroSignal.Location.setShared(shared) }
+
+    /// "Kullanırken" konum iznini ister: izin sorulmadıysa önce açıklama uyarısı (`rationale`, nil ise SDK'nın tr/en
+    /// metni), sonra sistem istemi. `completion` ana iş parçacığında bir kez çağrılır (reddedilmiş/kısıtlı izin veya
+    /// Info.plist'te `NSLocationWhenInUseUsageDescription` yoksa false).
+    @objc(requestLocationPermissionWithRationale:completion:)
+    public static func requestLocationPermission(rationale: String?, completion: @escaping (Bool) -> Void) {
+        HeroSignal.Location.requestPermission(rationale: rationale, completion: completion)
+    }
+
     // MARK: Ön plan kararı
 
     @objc(foregroundPreventDefault:)

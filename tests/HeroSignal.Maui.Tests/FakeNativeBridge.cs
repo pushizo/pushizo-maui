@@ -147,6 +147,30 @@ internal sealed class FakeNativeBridge : INativeBridge
     public void StartDefaultLiveActivity(string activityId, string attributesJson, string contentStateJson, NativeResult result) =>
         Respond($"startDefaultLiveActivity:{activityId}:{attributesJson}:{contentStateJson}", LiveActivityResponse, result);
 
+    /// <summary>Yerel SDK'daki kalıcı konum paylaşımı tercihi.</summary>
+    public bool LocationSharedValue { get; set; }
+
+    /// <summary>Konum izni isteğinin sonucu.</summary>
+    public bool LocationPermissionResult { get; set; } = true;
+
+    public string? LastLocationRationale { get; private set; }
+
+    public bool GetLocationShared() => LocationSharedValue;
+
+    public void SetLocationShared(bool shared)
+    {
+        Record($"locationShared:{shared}");
+        LocationSharedValue = shared;
+    }
+
+    public void RequestLocationPermission(string? rationale, Action<bool> completion)
+    {
+        Record("requestLocationPermission");
+        LastLocationRationale = rationale;
+        // Gerçek köprüler sonucu başka bir iş parçacığından (iOS: ana, Android: UI/yaşam döngüsü) döndürür.
+        ThreadPool.QueueUserWorkItem(_ => completion(LocationPermissionResult));
+    }
+
     public void ForegroundPreventDefault(string eventId) => Record($"preventDefault:{eventId}");
     public void ForegroundDisplay(string eventId) => Record($"display:{eventId}");
 }

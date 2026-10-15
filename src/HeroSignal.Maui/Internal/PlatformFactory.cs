@@ -17,8 +17,8 @@ internal static class PlatformFactory
 
 /// <summary>
 /// Yerel HeroSignal SDK'sı olmayan hedefler (Windows, MacCatalyst, platformdan bağımsız net8.0): yazma çağrıları
-/// etkisizdir ve bir kez uyarı günlüğe yazılır; okuma çağrıları boş değer, bildirim kutusu, tercihler ve Live Activities
-/// <see cref="HeroSignalException.PlatformNotSupported"/> döndürür.
+/// etkisizdir ve bir kez uyarı günlüğe yazılır; okuma çağrıları boş değer, izin istekleri (bildirim, konum) false,
+/// bildirim kutusu, tercihler ve Live Activities <see cref="HeroSignalException.PlatformNotSupported"/> döndürür.
 /// </summary>
 internal sealed class UnsupportedPlatform : IHeroSignalPlatform
 {
@@ -108,4 +108,14 @@ internal sealed class UnsupportedPlatform : IHeroSignalPlatform
 
     public Task StartDefaultLiveActivityAsync(string activityId, IReadOnlyDictionary<string, object> attributes, IReadOnlyDictionary<string, object> contentState) =>
         LiveActivitiesNotSupported();
+
+    // Konum: bildirim izniyle aynı desen (yazma etkisiz, okuma false, izin isteği false; hata fırlatılmaz).
+    public bool LocationShared => false;
+    public void SetLocationShared(bool shared) => Ignored(nameof(SetLocationShared));
+
+    public Task<bool> RequestLocationPermissionAsync(string? rationale)
+    {
+        Ignored(nameof(RequestLocationPermissionAsync));
+        return Task.FromResult(false);
+    }
 }

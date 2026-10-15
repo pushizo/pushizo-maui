@@ -324,6 +324,39 @@ public sealed class LiveActivitiesManager
     }
 }
 
+/// <summary>
+/// Konum paylaşımı (<c>HeroSignal.Location</c>, v2 Faz 17b). Yalnızca ön plan: paylaşım açık ve izin varken yerel SDK
+/// konumu oturum başında ve uygulama ön plana döndüğünde en sık 5 dakikada bir push aboneliğine yazar; izin yoksa veya
+/// gizlilik onayı (<see cref="HeroSignal.SetConsentGiven"/>) verilmemişse hiçbir şey göndermez. Tercih kalıcıdır. İlk
+/// konum sunucuda KVKK açık rıza kaydı sayılır; <see cref="SetShared"/>(false) konumu ve rıza kaydını sildirir.
+/// Windows ve MacCatalyst hedeflerinde etkisizdir (<see cref="IsShared"/> ve <see cref="RequestPermissionAsync"/> false).
+/// </summary>
+public sealed class LocationManager
+{
+    internal LocationManager()
+    {
+    }
+
+    /// <summary>Paylaşım açık mı (kalıcı tercih; izin durumundan bağımsız). Başlatılmadan önce false.</summary>
+    public bool IsShared => HeroSignal.PlatformOrNull()?.LocationShared ?? false;
+
+    /// <summary>
+    /// Paylaşımı açar/kapatır. Açılırken izin varsa konum hemen gönderilir; kapatılınca sunucuya <c>location: null</c>
+    /// gönderilir (konum ve rıza kaydı silinir).
+    /// </summary>
+    public void SetShared(bool shared) => HeroSignal.Platform().SetLocationShared(shared);
+
+    /// <summary>
+    /// "Kullanırken" konum iznini ister (arka plan konumu istenmez). İzin yoksa önce açıklama diyaloğu gösterilir
+    /// (<paramref name="rationale"/>; boşsa SDK'nın Türkçe/İngilizce varsayılan metni), kullanıcı devam ederse sistem
+    /// istemi açılır. Sonuç: izin var/verildi ise true; reddedildi, kısıtlı, açıklamada vazgeçildi ya da gerekli
+    /// yapılandırma (iOS <c>NSLocationWhenInUseUsageDescription</c>, Android manifest konum izni) eksikse false.
+    /// İzin, paylaşımı açmaz; ardından <see cref="SetShared"/>(true) çağrılmalıdır.
+    /// </summary>
+    public Task<bool> RequestPermissionAsync(string? rationale = null) =>
+        HeroSignal.Platform().RequestLocationPermissionAsync(string.IsNullOrWhiteSpace(rationale) ? null : rationale.Trim());
+}
+
 /// <summary>Hata ayıklama (<c>HeroSignal.Debug</c>).</summary>
 public sealed class DebugManager
 {

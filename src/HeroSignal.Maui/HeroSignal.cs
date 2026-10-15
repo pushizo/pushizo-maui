@@ -38,6 +38,7 @@ public static class HeroSignal
     public static InboxManager Inbox { get; } = new();
     public static SessionManager Session { get; } = new();
     public static LiveActivitiesManager LiveActivities { get; } = new();
+    public static LocationManager Location { get; } = new();
     public static DebugManager Debug { get; } = new();
 
     /// <summary>

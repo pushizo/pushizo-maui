@@ -114,6 +114,13 @@ internal sealed class IosNativeBridge : INativeBridge
     public void StartDefaultLiveActivity(string activityId, string attributesJson, string contentStateJson, NativeResult result) =>
         HSMauiBridge.StartDefaultLiveActivity(activityId, attributesJson, contentStateJson, (json, code, message) => result(json, code, message));
 
+    public bool GetLocationShared() => HSMauiBridge.LocationShared();
+
+    public void SetLocationShared(bool shared) => HSMauiBridge.UpdateLocationShared(shared);
+
+    public void RequestLocationPermission(string? rationale, Action<bool> completion) =>
+        HSMauiBridge.RequestLocationPermission(rationale, granted => completion(granted));
+
     public void ForegroundPreventDefault(string eventId) => HSMauiBridge.ForegroundPreventDefault(eventId);
 
     public void ForegroundDisplay(string eventId) => HSMauiBridge.ForegroundDisplay(eventId);
