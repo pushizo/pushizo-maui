@@ -118,6 +118,58 @@ internal static partial class Validation
         if (limit is < 1 or > 200) throw new ArgumentOutOfRangeException(paramName, limit, "limit 1-200 olmalı.");
     }
 
+    // \z: .NET'te $ sondaki satır sonunu da kabul eder.
+    [GeneratedRegex(@"^[A-Za-z0-9_.:-]{1,100}\z", RegexOptions.CultureInvariant)]
+    private static partial Regex LiveActivityIdRegex();
+
+    /// <summary>Live Activity alan anahtarı üst sınırı (yerel SDK ve sunucu).</summary>
+    public const int MaxLiveActivityKeyLength = 64;
+
+    /// <summary>Live Activity metin değeri üst sınırı (yerel SDK ve sunucu).</summary>
+    public const int MaxLiveActivityStringLength = 4000;
+
+    /// <summary>Etkinlik kimliği: 1-100 karakter; harf, rakam ve <c>_ . : -</c> (sunucu start kuralı).</summary>
+    public static string RequireLiveActivityId(string activityId) =>
+        activityId is not null && LiveActivityIdRegex().IsMatch(activityId)
+            ? activityId
+            : throw InvalidLiveActivity("activityId 1-100 karakter olmalı (harf, rakam ve _ . : -).");
+
+    /// <summary>
+    /// Live Activity alanlarını doğrular ve normalize eder: anahtar 1-64 karakter, değer metin (en çok 4000 karakter),
+    /// sonlu sayı (tam sayılar long, diğerleri double) veya bool. <paramref name="reserveHeroSignalKey"/> true ise
+    /// (<c>attributes</c>) <c>herosignal</c> anahtarı sunucu verisi için ayrılmıştır. Hata: <c>INVALID_ARGUMENT</c>.
+    /// </summary>
+    public static IReadOnlyDictionary<string, object> NormalizeLiveActivityValues(IDictionary<string, object> values, string paramName, bool reserveHeroSignalKey)
+    {
+        if (values is null) throw InvalidLiveActivity($"{paramName} gerekli.");
+        var result = new Dictionary<string, object>(values.Count, StringComparer.Ordinal);
+        foreach (var (key, value) in values)
+        {
+            if (string.IsNullOrEmpty(key) || key.Length > MaxLiveActivityKeyLength)
+                throw InvalidLiveActivity($"{paramName} anahtarları 1-{MaxLiveActivityKeyLength} karakter olmalı.");
+            if (reserveHeroSignalKey && key == "herosignal")
+                throw InvalidLiveActivity($"{paramName} içinde 'herosignal' anahtarı ayrılmıştır.");
+            result[key] = NormalizeLiveActivityValue(value) ??
+                throw InvalidLiveActivity($"{paramName}[\"{key}\"] metin (en çok {MaxLiveActivityStringLength} karakter), sonlu sayı veya bool olmalı.");
+        }
+        return result;
+    }
+
+    private static object? NormalizeLiveActivityValue(object? value) => value switch
+    {
+        string s => s.Length <= MaxLiveActivityStringLength ? s : null,
+        bool b => b,
+        sbyte or byte or short or ushort or int or uint or long => Convert.ToInt64(value, System.Globalization.CultureInfo.InvariantCulture),
+        ulong u => u <= long.MaxValue ? (long)u : (double)u,
+        // float, en kısa ondalık gösterimiyle çevrilir (0.1f → 0.1; doğrudan dönüşüm 0.10000000149… verir).
+        float f => float.IsFinite(f) ? double.Parse(f.ToString("R", System.Globalization.CultureInfo.InvariantCulture), System.Globalization.CultureInfo.InvariantCulture) : null,
+        double d => double.IsFinite(d) ? d : null,
+        decimal m => (double)m,
+        _ => null,
+    };
+
+    private static HeroSignalException InvalidLiveActivity(string message) => new(HeroSignalException.InvalidArgument, message);
+
     public const int MaxPreferencesPerRequest = 100;
 
     /// <summary>Tercih kanalları (ADR-0019 §4; yerel SDK'lardaki <c>HsPreferencesParser</c> ile aynı küme).</summary>

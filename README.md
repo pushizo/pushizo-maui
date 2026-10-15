@@ -112,6 +112,79 @@ henüz tamamlanmadı; `INVALID_ARGUMENT`: yerel SDK girdiyi reddetti; diğerleri
 girdiyi köprüden önce doğrular (1-100 kayıt, kategori 1-64 karakter, kanal `ios_push` | `android_push` | `web_push` |
 `email` | `sms` ya da null); geçersizse `ArgumentException`.
 
+### JWT ile kimlik doğrulama
+
+App ayarlarında kimlik doğrulama kipi (`identity_verification_mode`) `jwt` veya `both` ise kullanıcı, sunucunuzda
+imzalanmış kısa ömürlü bir ES256 JWT ile kimliklendirilir (ADR-0023 §9; talepler: `sub` = external_id, `aud` = app_id, `exp`/`iat` zorunlu, en çok 24 saat, yalnızca ES256).
+
+```csharp
+HeroSignal.Login("user_42", jwt: jwtFromYourServer);                         // yalnızca JWT
+HeroSignal.Login("user_42", identityHash: hmac, jwt: jwtFromYourServer);     // both kipinde ikisi birlikte
+HeroSignal.UpdateUserJwt(refreshedJwt); // süresi dolmadan yenileyin
+HeroSignal.Logout();
+```
+
+- JWT yerel SDK'da identity hash ile aynı kalıcı depoda saklanır ve tüm `/sdk/v1/...` isteklerinde
+  `Authorization: Bearer <jwt>` başlığıyla gider; gövdeye/URL'ye yazılmaz, loglanmaz. `Logout` belirteci siler.
+- `/config` yanıtında `identity_verification_required` true ise login öncesi kanıt denetlenir: `jwt` kipinde JWT, `hmac`
+  kipinde `identityHash` zorunludur, `both` kipinde biri yeter; eksikse `Login` `HeroSignalException` (`NOT_READY`)
+  fırlatır. Alan gelmeyen eski sunucularda kip `hmac` sayılır; mevcut `Login(id, identityHash)` çağrıları aynen çalışır.
+- `UpdateUserJwt` giriş yapılmamışsa `HeroSignalException` (`NOT_READY`), boş belirteçte `ArgumentException` fırlatır;
+  başarıda kuyrukta bekleyen işlemler yeni belirteçle yeniden denenir.
+
+### Live Activities (iOS)
+
+Köprü, iOS SDK'nın genel türü `HeroSignalDefaultLiveActivityAttributes`'ı kullanır (ADR-0024). Dashboard/API'de Live
+Activity türü adı tam olarak `HeroSignalDefaultLiveActivityAttributes` olmalıdır.
+
+```csharp
+// Initialize'dan sonra, uygulama her açıldığında: push-to-start (iOS 17.2+) ve güncelleme belirteçleri kaydedilir.
+await HeroSignal.LiveActivities.SetupDefaultLiveActivityAsync();
+
+// Yerel başlatma (iOS 16.1+); sunucu sonraki update/end çağrılarını bu kimlikle yapar.
+await HeroSignal.LiveActivities.StartDefaultLiveActivityAsync(
+    "order_42",
+    new Dictionary<string, object> { ["title"] = "Sipariş #42" },
+    new Dictionary<string, object> { ["status"] = "Hazırlanıyor", ["eta"] = 15 });
+```
+
+- Widget extension (Xcode'da Swift ile; MAUI uygulamasına `AdditionalAppExtensions` öğesiyle eklenir):
+  ```swift
+  import ActivityKit
+  import SwiftUI
+  import WidgetKit
+  import HeroSignalExtension // CocoaPods: pod 'HeroSignal/Extension' + import HeroSignal
+
+  struct OrderLiveActivity: Widget {
+      var body: some WidgetConfiguration {
+          ActivityConfiguration(for: HeroSignalDefaultLiveActivityAttributes.self) { context in
+              VStack {
+                  Text(context.attributes.data["title"]?.stringValue ?? "")
+                  Text(context.state.data["status"]?.description ?? "")
+              }
+          } dynamicIsland: { context in
+              DynamicIsland {
+                  DynamicIslandExpandedRegion(.center) { Text(context.state.data["status"]?.description ?? "") }
+              } compactLeading: { Text("HS") } compactTrailing: { EmptyView() } minimal: { EmptyView() }
+          }
+      }
+  }
+  ```
+  SPM'de widget hedefine `HeroSignalExtension` ürünü eklenir (`import HeroSignalExtension`); CocoaPods'ta
+  `HeroSignal/Extension` alt spec'i (`import HeroSignal`).
+- Uygulamanın `Platforms/iOS/Info.plist` dosyasına `NSSupportsLiveActivities` = `YES` ekleyin.
+- Sunucu: `POST /v1/apps/{appId}/live-activities/HeroSignalDefaultLiveActivityAttributes/start|update|end`
+  (`attributes` ve `content_state` düz nesnedir; widget'ta `data` sözlüğünden okunur). Push-to-start iOS 17.2+,
+  yerel başlatma iOS 16.1+ gerektirir.
+- Köprü girdiyi doğrular: `activityId` 1-100 karakter (harf, rakam, `_ . : -`), anahtar 1-64 karakter, değer metin
+  (en çok 4000 karakter), sonlu sayı veya bool; `attributes` içinde `herosignal` anahtarı ayrılmıştır. Geçersizse
+  `HeroSignalException` (`INVALID_ARGUMENT`).
+- Hatalar `HeroSignalException.Code` taşır: `PLATFORM_NOT_SUPPORTED` (iOS 16.1 öncesi, Android ve diğer hedefler),
+  `NOT_READY` (yerel SDK başlatılmadı), `INVALID_ARGUMENT`, `LIVE_ACTIVITY_FAILED` (Live Activities kapalı,
+  `NSSupportsLiveActivities` eksik vb.).
+- Tip-güvenli kendi `ActivityAttributes` türünüz için native tarafta `HeroSignal.LiveActivities.register(MyAttributes.self)`
+  çağırın (ayrıntı: `docs/sdk/ios.md` "Live Activities").
+
 ## Mimari
 
 ```

@@ -103,9 +103,25 @@ public final class HSMauiBridge: NSObject {
     @objc(setConsentGiven:)
     public static func setConsentGiven(_ given: Bool) { HeroSignal.setConsentGiven(given) }
 
-    @objc(loginWithExternalId:identityHash:)
-    public static func login(externalId: String, identityHash: String?) {
-        HeroSignal.login(externalId, identityHash: identityHash)
+    /// Kanıt app'in kimlik doğrulama kipine uymuyorsa hata mesajı döner ve giriş yapılmaz; başarıda nil.
+    @objc(loginWithExternalId:identityHash:jwt:)
+    public static func login(externalId: String, identityHash: String?, jwt: String?) -> String? {
+        if let message = HeroSignal.loginProofError(identityHash: identityHash, jwt: jwt) { return message }
+        HeroSignal.login(externalId, identityHash: identityHash, jwt: jwt)
+        return nil
+    }
+
+    /// Kimlik JWT'sini yeniler; giriş yapılmamışsa hata mesajı döner, başarıda nil.
+    @objc(updateUserJwt:)
+    public static func updateUserJwt(_ jwt: String) -> String? {
+        do {
+            try HeroSignal.updateUserJwt(jwt)
+            return nil
+        } catch HSError.invalidArgument(let message) {
+            return message
+        } catch {
+            return "Önce login ile kullanıcı kimliklendirilmeli"
+        }
     }
 
     @objc(logout)
@@ -315,6 +331,29 @@ public final class HSMauiBridge: NSObject {
         HeroSignal.Session.sendEvent(name, properties: properties, value: hasValue ? value : nil)
     }
 
+    // MARK: Live Activities (ADR-0024)
+
+    /// Genel `HeroSignalDefaultLiveActivityAttributes` türünü izlemeye alır; başarı JSON'u nil. Hata kodu
+    /// `HSLiveActivityError.code` (PLATFORM_NOT_SUPPORTED | NOT_READY | INVALID_ARGUMENT | LIVE_ACTIVITY_FAILED).
+    @objc(setupDefaultLiveActivityWithCompletion:)
+    public static func setupDefaultLiveActivity(completion: @escaping (String?, String?, String?) -> Void) {
+        liveActivity(completion) { try HeroSignal.LiveActivities.setupDefaultLiveActivity() }
+    }
+
+    /// Genel türle yerel etkinlik başlatır (iOS 16.1+). `attributesJson`/`contentStateJson`: düz JSON nesnesi (metin, sayı,
+    /// mantıksal değer); doğrulama yerel SDK'dadır. Başarı JSON'u nil.
+    @objc(startDefaultLiveActivity:attributesJson:contentStateJson:completion:)
+    public static func startDefaultLiveActivity(_ activityId: String, attributesJson: String, contentStateJson: String, completion: @escaping (String?, String?, String?) -> Void) {
+        guard let attributes = jsonObject(attributesJson) as? [String: Any],
+              let contentState = jsonObject(contentStateJson) as? [String: Any] else {
+            completion(nil, "INVALID_ARGUMENT", "attributes ve contentState JSON nesnesi olmalı")
+            return
+        }
+        liveActivity(completion) {
+            try HeroSignal.LiveActivities.startDefaultLiveActivity(activityId: activityId, attributes: attributes, contentState: contentState)
+        }
+    }
+
     // MARK: Ön plan kararı
 
     @objc(foregroundPreventDefault:)
@@ -404,6 +443,21 @@ public final class HSMauiBridge: NSObject {
                 }
             } catch {
                 completion(nil, "HS_ERROR", error.localizedDescription)
+            }
+        }
+    }
+
+    /// Live Activities çağrısını ana iş parçacığında (ActivityKit) çalıştırır; `HSLiveActivityError` kodu ve mesajı aynen,
+    /// diğer hatalar `LIVE_ACTIVITY_FAILED` olarak iletilir.
+    private static func liveActivity(_ completion: @escaping (String?, String?, String?) -> Void, _ body: @escaping () throws -> Void) {
+        onMain {
+            do {
+                try body()
+                completion(nil, nil, nil)
+            } catch let error as HSLiveActivityError {
+                completion(nil, error.code, error.message)
+            } catch {
+                completion(nil, "LIVE_ACTIVITY_FAILED", error.localizedDescription)
             }
         }
     }

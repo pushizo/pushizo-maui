@@ -269,6 +269,61 @@ public sealed class SessionManager
     }
 }
 
+/// <summary>
+/// iOS Live Activities (<c>HeroSignal.LiveActivities</c>, ADR-0024). Köprü, genel
+/// <c>HeroSignalDefaultLiveActivityAttributes</c> türünü kullanır; sunucuda (dashboard/API) tür adı
+/// <see cref="DefaultActivityType"/> olarak tanımlanır ve widget extension'da
+/// <c>ActivityConfiguration(for: HeroSignalDefaultLiveActivityAttributes.self)</c> yazılır. Android ve diğer hedeflerde
+/// çağrılar <see cref="HeroSignalException"/> (<c>PLATFORM_NOT_SUPPORTED</c>) ile sonuçlanır.
+/// </summary>
+public sealed class LiveActivitiesManager
+{
+    /// <summary>Genel türün sunucudaki adı.</summary>
+    public const string DefaultActivityType = "HeroSignalDefaultLiveActivityAttributes";
+
+    internal LiveActivitiesManager()
+    {
+    }
+
+    /// <summary>
+    /// Genel türü izlemeye alır: push-to-start belirteci (iOS 17.2+) ve başlayan her etkinliğin güncelleme belirteci
+    /// sunucuya kaydedilir. <see cref="HeroSignal.Initialize"/>'dan sonra, uygulama her açıldığında çağrılmalıdır.
+    /// </summary>
+    /// <exception cref="HeroSignalException">
+    /// <c>PLATFORM_NOT_SUPPORTED</c> (iOS 16.1 öncesi, Android), <c>NOT_READY</c> (yerel SDK başlatılmadı).
+    /// </exception>
+    public Task SetupDefaultLiveActivityAsync() => HeroSignal.Platform().SetupDefaultLiveActivityAsync();
+
+    /// <summary>
+    /// Genel türle yerel bir etkinlik başlatır (iOS 16.1+); sunucu sonraki <c>update</c>/<c>end</c> çağrılarını
+    /// <paramref name="activityId"/> ile yapar. Değerler metin (en çok 4000 karakter), sonlu sayı veya bool; anahtarlar
+    /// 1-64 karakter; <paramref name="attributes"/> içinde <c>herosignal</c> anahtarı ayrılmıştır. Widget'ta değerler
+    /// <c>context.attributes.data["…"]</c> ve <c>context.state.data["…"]</c> ile okunur.
+    /// </summary>
+    /// <exception cref="HeroSignalException">
+    /// <c>INVALID_ARGUMENT</c> (geçersiz kimlik/alan), <c>PLATFORM_NOT_SUPPORTED</c>, <c>NOT_READY</c>,
+    /// <c>LIVE_ACTIVITY_FAILED</c> (<see cref="HeroSignalException.LiveActivityFailed"/>; Live Activities kapalı vb.).
+    /// </exception>
+    public Task StartDefaultLiveActivityAsync(string activityId, IDictionary<string, object> attributes, IDictionary<string, object> contentState)
+    {
+        var platform = HeroSignal.Platform();
+        string id;
+        IReadOnlyDictionary<string, object> attributeValues, stateValues;
+        try
+        {
+            id = Validation.RequireLiveActivityId(activityId);
+            attributeValues = Validation.NormalizeLiveActivityValues(attributes, nameof(attributes), reserveHeroSignalKey: true);
+            stateValues = Validation.NormalizeLiveActivityValues(contentState, nameof(contentState), reserveHeroSignalKey: false);
+        }
+        catch (HeroSignalException e)
+        {
+            // Tüm Live Activity hataları (yerel SDK'dan gelenlerle aynı biçimde) Task üzerinden iletilir.
+            return Task.FromException(e);
+        }
+        return platform.StartDefaultLiveActivityAsync(id, attributeValues, stateValues);
+    }
+}
+
 /// <summary>Hata ayıklama (<c>HeroSignal.Debug</c>).</summary>
 public sealed class DebugManager
 {

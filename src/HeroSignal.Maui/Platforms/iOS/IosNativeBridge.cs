@@ -15,7 +15,9 @@ internal sealed class IosNativeBridge : INativeBridge
 
     public void SetConsentGiven(bool given) => HSMauiBridge.SetConsentGiven(given);
 
-    public void Login(string externalId, string? identityHash) => HSMauiBridge.Login(externalId, identityHash);
+    public string? Login(string externalId, string? identityHash, string? jwt) => HSMauiBridge.Login(externalId, identityHash, jwt);
+
+    public string? UpdateUserJwt(string jwt) => HSMauiBridge.UpdateUserJwt(jwt);
 
     public void Logout() => HSMauiBridge.Logout();
 
@@ -103,6 +105,14 @@ internal sealed class IosNativeBridge : INativeBridge
 
     public void SendEvent(string name, string propertiesJson, double value, bool hasValue) =>
         HSMauiBridge.SendEvent(name, propertiesJson, value, hasValue);
+
+    public bool SupportsLiveActivities => true;
+
+    public void SetupDefaultLiveActivity(NativeResult result) =>
+        HSMauiBridge.SetupDefaultLiveActivity((json, code, message) => result(json, code, message));
+
+    public void StartDefaultLiveActivity(string activityId, string attributesJson, string contentStateJson, NativeResult result) =>
+        HSMauiBridge.StartDefaultLiveActivity(activityId, attributesJson, contentStateJson, (json, code, message) => result(json, code, message));
 
     public void ForegroundPreventDefault(string eventId) => HSMauiBridge.ForegroundPreventDefault(eventId);
 

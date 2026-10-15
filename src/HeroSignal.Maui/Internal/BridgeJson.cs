@@ -220,6 +220,32 @@ internal static class BridgeJson
         else w.WriteString(name, value);
     }
 
+    /// <summary>
+    /// Live Activity alanları → düz JSON nesnesi (<c>Validation.NormalizeLiveActivityValues</c> çıktısı: string, long,
+    /// double, bool).
+    /// </summary>
+    public static string LiveActivityValuesToJson(IReadOnlyDictionary<string, object> values)
+    {
+        using var stream = new MemoryStream();
+        using (var w = new Utf8JsonWriter(stream))
+        {
+            w.WriteStartObject();
+            foreach (var (key, value) in values)
+            {
+                switch (value)
+                {
+                    case string s: w.WriteString(key, s); break;
+                    case bool b: w.WriteBoolean(key, b); break;
+                    case long l: w.WriteNumber(key, l); break;
+                    case double d: w.WriteNumber(key, d); break;
+                    default: throw new InvalidOperationException("Normalize edilmemiş Live Activity değeri.");
+                }
+            }
+            w.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    }
+
     public static string ToJson(IReadOnlyDictionary<string, string> map) => JsonSerializer.Serialize(map, BridgeJsonContext.Default.IReadOnlyDictionaryStringString);
 
     public static string ToJson(IReadOnlyList<string> list) => JsonSerializer.Serialize(list, BridgeJsonContext.Default.IReadOnlyListString);

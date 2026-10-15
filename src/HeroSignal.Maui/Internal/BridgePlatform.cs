@@ -36,7 +36,16 @@ internal sealed class BridgePlatform : IHeroSignalPlatform
 
     public void SetConsentGiven(bool given) => _bridge.SetConsentGiven(given);
 
-    public void Login(string externalId, string? identityHash) => _bridge.Login(externalId, identityHash);
+    public void Login(string externalId, string? identityHash, string? jwt) =>
+        ThrowIfFailed(_bridge.Login(externalId, identityHash, jwt));
+
+    public void UpdateUserJwt(string jwt) => ThrowIfFailed(_bridge.UpdateUserJwt(jwt));
+
+    /// <summary>Yerel köprünün döndürdüğü kimlik hatası (kanıt eksik, kullanıcı yok) <c>NOT_READY</c> olarak fırlatılır.</summary>
+    private static void ThrowIfFailed(string? error)
+    {
+        if (error is not null) throw new HeroSignalException(HeroSignalException.NotReady, error);
+    }
 
     public void Logout() => _bridge.Logout();
 
@@ -140,6 +149,19 @@ internal sealed class BridgePlatform : IHeroSignalPlatform
 
     public void SendEvent(string name, Dictionary<string, object?> properties, double? value) =>
         _bridge.SendEvent(name, EventProperties.ToJson(properties), value ?? 0d, value.HasValue);
+
+    public Task SetupDefaultLiveActivityAsync() =>
+        _bridge.SupportsLiveActivities
+            ? Call<object?>(r => _bridge.SetupDefaultLiveActivity(r), _ => null)
+            : UnsupportedPlatform.LiveActivitiesNotSupported();
+
+    public Task StartDefaultLiveActivityAsync(string activityId, IReadOnlyDictionary<string, object> attributes, IReadOnlyDictionary<string, object> contentState)
+    {
+        if (!_bridge.SupportsLiveActivities) return UnsupportedPlatform.LiveActivitiesNotSupported();
+        var attributesJson = BridgeJson.LiveActivityValuesToJson(attributes);
+        var contentStateJson = BridgeJson.LiveActivityValuesToJson(contentState);
+        return Call<object?>(r => _bridge.StartDefaultLiveActivity(activityId, attributesJson, contentStateJson, r), _ => null);
+    }
 
     private static string Require(string? json) =>
         json ?? throw new HeroSignalException(HeroSignalException.InvalidResponse, "Köprü yanıtı boş.");

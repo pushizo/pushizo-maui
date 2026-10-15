@@ -52,7 +52,23 @@ internal sealed class FakeNativeBridge : INativeBridge
     }
 
     public void SetConsentGiven(bool given) => Record($"consent:{given}");
-    public void Login(string externalId, string? identityHash) => Record($"login:{externalId}:{identityHash ?? "<null>"}");
+    /// <summary>Login yanıtı (yerel köprünün döndürdüğü kanıt hatası; null = başarı).</summary>
+    public string? LoginError { get; set; }
+
+    /// <summary>UpdateUserJwt yanıtı (ör. giriş yapılmamış; null = başarı).</summary>
+    public string? UpdateUserJwtError { get; set; }
+
+    public string? Login(string externalId, string? identityHash, string? jwt)
+    {
+        Record(jwt is null ? $"login:{externalId}:{identityHash ?? "<null>"}" : $"login:{externalId}:{identityHash ?? "<null>"}:jwt={jwt}");
+        return LoginError;
+    }
+
+    public string? UpdateUserJwt(string jwt)
+    {
+        Record($"updateUserJwt:{jwt}");
+        return UpdateUserJwtError;
+    }
     public void Logout() => Record("logout");
     public void SetLogLevel(int level) => Record($"logLevel:{level}");
     public string? GetExternalId() => ExternalIdValue;
@@ -119,6 +135,17 @@ internal sealed class FakeNativeBridge : INativeBridge
         Record($"sendEvent:{name}");
         LastEvent = (name, propertiesJson, value, hasValue);
     }
+
+    /// <summary>false: Android köprüsü gibi Live Activities desteklenmez.</summary>
+    public bool SupportsLiveActivities { get; set; } = true;
+
+    /// <summary>Live Activities yanıtı: (json, hata kodu, hata mesajı).</summary>
+    public (string? Json, string? Code, string? Message) LiveActivityResponse { get; set; } = (null, null, null);
+
+    public void SetupDefaultLiveActivity(NativeResult result) => Respond("setupDefaultLiveActivity", LiveActivityResponse, result);
+
+    public void StartDefaultLiveActivity(string activityId, string attributesJson, string contentStateJson, NativeResult result) =>
+        Respond($"startDefaultLiveActivity:{activityId}:{attributesJson}:{contentStateJson}", LiveActivityResponse, result);
 
     public void ForegroundPreventDefault(string eventId) => Record($"preventDefault:{eventId}");
     public void ForegroundDisplay(string eventId) => Record($"display:{eventId}");

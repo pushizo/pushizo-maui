@@ -17,7 +17,7 @@ internal static class PlatformFactory
 
 /// <summary>
 /// Yerel HeroSignal SDK'sı olmayan hedefler (Windows, MacCatalyst, platformdan bağımsız net8.0): yazma çağrıları
-/// etkisizdir ve bir kez uyarı günlüğe yazılır; okuma çağrıları boş değer, bildirim kutusu ve tercihler
+/// etkisizdir ve bir kez uyarı günlüğe yazılır; okuma çağrıları boş değer, bildirim kutusu, tercihler ve Live Activities
 /// <see cref="HeroSignalException.PlatformNotSupported"/> döndürür.
 /// </summary>
 internal sealed class UnsupportedPlatform : IHeroSignalPlatform
@@ -37,12 +37,19 @@ internal sealed class UnsupportedPlatform : IHeroSignalPlatform
     private static Task<T> NotSupported<T>(string feature = "Bildirim kutusu") =>
         Task.FromException<T>(new HeroSignalException(HeroSignalException.PlatformNotSupported, $"{feature} yalnızca Android ve iOS'ta kullanılabilir."));
 
+    /// <summary>Live Activities iOS'a özgüdür (Android ve diğer hedeflerde aynı hata).</summary>
+    internal const string LiveActivitiesUnsupportedMessage = "Live Activities yalnızca iOS'ta desteklenir.";
+
+    internal static Task LiveActivitiesNotSupported() =>
+        Task.FromException(new HeroSignalException(HeroSignalException.PlatformNotSupported, LiveActivitiesUnsupportedMessage));
+
     public void Initialize(string appId, HeroSignalOptions options, IHeroSignalEventSink sink)
     {
     }
 
     public void SetConsentGiven(bool given) => Ignored(nameof(SetConsentGiven));
-    public void Login(string externalId, string? identityHash) => Ignored(nameof(Login));
+    public void Login(string externalId, string? identityHash, string? jwt) => Ignored(nameof(Login));
+    public void UpdateUserJwt(string jwt) => Ignored(nameof(UpdateUserJwt));
     public void Logout() => Ignored(nameof(Logout));
 
     public void SetLogLevel(LogLevel level)
@@ -97,4 +104,8 @@ internal sealed class UnsupportedPlatform : IHeroSignalPlatform
     public Task InboxArchiveAsync(string id) => NotSupported<bool>();
     public Task<int> InboxUnreadCountAsync() => NotSupported<int>();
     public void SendEvent(string name, Dictionary<string, object?> properties, double? value) => Ignored(nameof(SendEvent));
+    public Task SetupDefaultLiveActivityAsync() => LiveActivitiesNotSupported();
+
+    public Task StartDefaultLiveActivityAsync(string activityId, IReadOnlyDictionary<string, object> attributes, IReadOnlyDictionary<string, object> contentState) =>
+        LiveActivitiesNotSupported();
 }

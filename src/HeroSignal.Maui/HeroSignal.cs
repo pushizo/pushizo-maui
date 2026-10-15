@@ -37,6 +37,7 @@ public static class HeroSignal
     public static InAppMessagesManager InAppMessages { get; } = new();
     public static InboxManager Inbox { get; } = new();
     public static SessionManager Session { get; } = new();
+    public static LiveActivitiesManager LiveActivities { get; } = new();
     public static DebugManager Debug { get; } = new();
 
     /// <summary>
@@ -73,14 +74,34 @@ public static class HeroSignal
     /// <summary>KVKK/GDPR onayı (<see cref="HeroSignalOptions.RequiresPrivacyConsent"/>). false: kuyruk ve kimlik temizlenir.</summary>
     public static void SetConsentGiven(bool given) => Platform().SetConsentGiven(given);
 
-    /// <summary>Cihazı kullanıcı kimliğinize bağlar. Identity verification açıksa sunucunuzun ürettiği <paramref name="identityHash"/> zorunludur.</summary>
-    public static void Login(string externalId, string? identityHash = null)
+    /// <summary>
+    /// Cihazı kullanıcı kimliğinize bağlar. Identity verification açıksa app ayarına göre sunucunuzun ürettiği HMAC
+    /// <paramref name="identityHash"/> ve/veya ES256 <paramref name="jwt"/> (ADR-0023 §9; <c>sub</c> = externalId,
+    /// <c>aud</c> = appId) gerekir. JWT tüm SDK isteklerinde <c>Authorization: Bearer</c> başlığıyla gider; süresi dolunca
+    /// <see cref="UpdateUserJwt"/> ile yenilenir.
+    /// </summary>
+    /// <exception cref="HeroSignalException">Verilen kanıt app'in kimlik doğrulama kipine uymuyorsa (<c>NOT_READY</c>).</exception>
+    public static void Login(string externalId, string? identityHash = null, string? jwt = null)
     {
         if (string.IsNullOrWhiteSpace(externalId)) throw new ArgumentException("externalId gerekli.", nameof(externalId));
-        Platform().Login(externalId, string.IsNullOrEmpty(identityHash) ? null : identityHash);
+        Platform().Login(
+            externalId,
+            string.IsNullOrEmpty(identityHash) ? null : identityHash,
+            string.IsNullOrWhiteSpace(jwt) ? null : jwt);
     }
 
-    /// <summary>Cihazı kullanıcıdan ayırır (anonim kullanıcıya döner).</summary>
+    /// <summary>
+    /// Süresi dolan veya yenilenen kimlik JWT'sini günceller; sonraki SDK istekleri yeni belirteci taşır, kuyrukta bekleyen
+    /// işlemler yeniden denenir.
+    /// </summary>
+    /// <exception cref="HeroSignalException">Giriş yapılmamışsa (<c>NOT_READY</c>).</exception>
+    public static void UpdateUserJwt(string jwt)
+    {
+        if (string.IsNullOrWhiteSpace(jwt)) throw new ArgumentException("jwt gerekli.", nameof(jwt));
+        Platform().UpdateUserJwt(jwt);
+    }
+
+    /// <summary>Cihazı kullanıcıdan ayırır (anonim kullanıcıya döner); kimlik JWT'si cihazdan silinir.</summary>
     public static void Logout() => Platform().Logout();
 
     /// <summary>Başlatılmış platformu döndürür; <see cref="Initialize"/> çağrılmadıysa hata fırlatır.</summary>
