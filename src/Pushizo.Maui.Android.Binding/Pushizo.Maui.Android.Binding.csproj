@@ -1,0 +1,69 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pushizo Android SDK'sı için .NET Android binding'i. İki AAR içerir:
+      - pushizo-release.aar (com.pushizo:pushizo-android): yerel SDK; uygulamaya paketlenir, C#'a bağlanmaz
+        (Bind=false). Kotlin object/lambda/Result tabanlı API'si yerine aşağıdaki köprü kullanılır.
+      - pushizo-maui-bridge-release.aar (com.pushizo.maui): yalnızca metin/JSON ve arayüz geri çağrıları kullanan
+        Java dostu köprü (sdk/maui/native/android/bridge); C#'a bağlanır.
+    AAR'lar derleme sırasında sdk/maui/native/android Gradle projesinden (sdk/android kaynakları dahil edilerek) bu
+    projenin build/native klasörüne üretilir; sdk/android altına çıktı yazılmaz. Hazır AAR kullanmak için:
+    -p:PushizoAndroidAar=<yol> -p:PushizoBridgeAar=<yol>.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>$(PushizoAndroidTargets)</TargetFrameworks>
+    <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+    <RootNamespace>PushizoSdk.Native.Android</RootNamespace>
+    <AssemblyName>Pushizo.Maui.Android.Binding</AssemblyName>
+    <PackageId>Pushizo.Maui.Android.Binding</PackageId>
+    <Description>Pushizo Android SDK (com.pushizo:pushizo-android) için .NET Android binding'i. Doğrudan değil, Pushizo.Maui üzerinden kullanılır.</Description>
+    <IsPackable>true</IsPackable>
+    <!-- Köprü yüzeyi küçük ve elle tasarlandı; üretilen kodda belge uyarısı beklenmez. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <PushizoNativeDir>$(MSBuildProjectDirectory)\build\native</PushizoNativeDir>
+    <PushizoAndroidAar Condition="'$(PushizoAndroidAar)' == ''">$(PushizoNativeDir)\gradle\pushizo\outputs\aar\pushizo-release.aar</PushizoAndroidAar>
+    <PushizoBridgeAar Condition="'$(PushizoBridgeAar)' == ''">$(PushizoNativeDir)\gradle\pushizo-maui-bridge\outputs\aar\pushizo-maui-bridge-release.aar</PushizoBridgeAar>
+    <PushizoNativeProjectDir>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\native\android'))</PushizoNativeProjectDir>
+    <PushizoGradleInitScript>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..\tools\pushizo-native-out.init.gradle'))</PushizoGradleInitScript>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <TransformFile Include="Transforms\Metadata.xml" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Yerel SDK'nın Maven bağımlılıklarının .NET karşılıkları (sdk/android/pushizo/build.gradle.kts). -->
+    <PackageReference Include="Xamarin.Kotlin.StdLib" Version="2.0.21.4" />
+    <PackageReference Include="Xamarin.KotlinX.Coroutines.Android" Version="1.9.0.4" />
+    <PackageReference Include="Xamarin.AndroidX.Core.Core.Ktx" Version="1.16.0.2" />
+    <PackageReference Include="Xamarin.AndroidX.Work.Work.Runtime.Ktx" Version="2.10.0.5" />
+    <PackageReference Include="Xamarin.AndroidX.Lifecycle.Process" Version="2.8.7.4" />
+    <PackageReference Include="Xamarin.Firebase.Messaging" Version="124.1.1.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AndroidLibrary Include="$(PushizoAndroidAar)" Link="Jars\pushizo-release.aar" Bind="false" />
+    <AndroidLibrary Include="$(PushizoBridgeAar)" Link="Jars\pushizo-maui-bridge-release.aar" />
+  </ItemGroup>
+
+  <!--
+    AAR'lar yoksa Gradle ile üretilir. Gradle çıktı (build), proje önbelleği (.gradle) ve Kotlin oturum klasörü
+    (.kotlin) bu projenin build/native klasörüne yönlendirilir. Gereken ortam: JAVA_HOME (JDK 17) ve ANDROID_HOME
+    (ya da sdk/maui/native/android/local.properties içindeki sdk.dir), PATH'te gradle 8.x.
+  -->
+  <Target Name="PushizoBuildNativeAar" BeforeTargets="PrepareForBuild;_ResolveLibraryProjectImports;CollectPackageReferences" Condition="!Exists('$(PushizoAndroidAar)') or !Exists('$(PushizoBridgeAar)')">
+    <Message Importance="high" Text="Pushizo: yerel Android AAR'ları üretiliyor ($(PushizoNativeProjectDir))" />
+    <PropertyGroup>
+      <!-- ANDROID_HOME tanımlı değilse MAUI'nin çözdüğü ya da varsayılan konumdaki Android SDK Gradle'a iletilir. -->
+      <PushizoGradleAndroidHome Condition="'$(PushizoGradleAndroidHome)' == ''">$(ANDROID_HOME)</PushizoGradleAndroidHome>
+      <PushizoGradleAndroidHome Condition="'$(PushizoGradleAndroidHome)' == ''">$(AndroidSdkDirectory)</PushizoGradleAndroidHome>
+      <PushizoGradleAndroidHome Condition="'$(PushizoGradleAndroidHome)' == '' and Exists('$(LocalAppData)\Android\Sdk')">$(LocalAppData)\Android\Sdk</PushizoGradleAndroidHome>
+    </PropertyGroup>
+    <Exec Command="gradle -p &quot;$(PushizoNativeProjectDir)&quot; --project-cache-dir &quot;$(PushizoNativeDir)\.gradle-project&quot; -I &quot;$(PushizoGradleInitScript)&quot; -PpushizoOutDir=&quot;$(PushizoNativeDir)\gradle&quot; -Pkotlin.project.persistent.dir=&quot;$(PushizoNativeDir)\.kotlin&quot; :pushizo:assembleRelease :pushizo-maui-bridge:assembleRelease --console=plain -q" EnvironmentVariables="ANDROID_HOME=$(PushizoGradleAndroidHome)" />
+    <Error Condition="!Exists('$(PushizoAndroidAar)')" Text="Pushizo: AAR üretilemedi: $(PushizoAndroidAar)" />
+    <Error Condition="!Exists('$(PushizoBridgeAar)')" Text="Pushizo: köprü AAR'ı üretilemedi: $(PushizoBridgeAar)" />
+  </Target>
+
+  <Target Name="PushizoCleanNativeAar" AfterTargets="Clean">
+    <RemoveDir Directories="$(PushizoNativeDir)\gradle" />
+  </Target>
+</Project>

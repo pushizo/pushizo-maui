@@ -1,7 +1,7 @@
-# HeroSignal .NET MAUI SDK (`HeroSignal.Maui`)
+# Pushizo .NET MAUI SDK (`Pushizo.Maui`)
 
 Push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, bildirim tercihleri, konum paylaşımı ve e-posta/SMS abonelikleri için .NET MAUI
-SDK'sı. Yerel HeroSignal Android (`com.herosignal:herosignal-android`) ve iOS (`HeroSignal` Swift) SDK'larını sarar;
+SDK'sı. Yerel Pushizo Android (`com.pushizo:pushizo-android`) ve iOS (`Pushizo` Swift) SDK'larını sarar;
 tetik değerlendirme, çevrimdışı kuyruk, teslimat geri bildirimi ve in-app çizimi yerel SDK'dadır. API yüzeyi
 plan 06 §6.1 (eski sağlayıcı v5 ile uyumlu) ve Flutter eklentisiyle aynıdır.
 
@@ -14,16 +14,16 @@ plan 06 §6.1 (eski sağlayıcı v5 ile uyumlu) ve Flutter eklentisiyle aynıdı
 ## Kurulum
 
 ```bash
-dotnet add package HeroSignal.Maui
+dotnet add package Pushizo.Maui
 ```
 
 ```csharp
 // MauiProgram.cs
-using HeroSignalSdk.Maui;
+using PushizoSdk.Maui;
 
 var builder = MauiApp.CreateBuilder();
 builder.UseMauiApp<App>()
-       .UseHeroSignal("app_…", o =>
+       .UsePushizo("app_…", o =>
        {
            o.ApiUrl = "https://api.example.com";
            o.RequiresPrivacyConsent = false; // KVKK/GDPR: true ise SetConsentGiven(true) gelene kadar ağ çağrısı yok
@@ -38,9 +38,9 @@ builder.UseMauiApp<App>()
     <GoogleServicesJson Include="Platforms/Android/google-services.json" />
   </ItemGroup>
   ```
-- Android 13+ bildirim izni `HeroSignal.Notifications.RequestPermissionAsync()` ile istenir. `UseHeroSignal` izin
-  sonucunu yaşam döngüsü olayından otomatik alır; yalnızca `HeroSignal.Initialize` kullanıyorsanız `MainActivity`
-  içinde `HeroSignalAndroid.OnRequestPermissionsResult(requestCode)` çağırın.
+- Android 13+ bildirim izni `Pushizo.Notifications.RequestPermissionAsync()` ile istenir. `UsePushizo` izin
+  sonucunu yaşam döngüsü olayından otomatik alır; yalnızca `Pushizo.Initialize` kullanıyorsanız `MainActivity`
+  içinde `PushizoAndroid.OnRequestPermissionsResult(requestCode)` çağırın.
 
 ### iOS
 
@@ -50,64 +50,64 @@ builder.UseMauiApp<App>()
   ```csharp
   [Export("application:didRegisterForRemoteNotificationsWithDeviceToken:")]
   public void RegisteredForRemoteNotifications(UIApplication application, NSData deviceToken) =>
-      HeroSignalIos.RegisteredForRemoteNotifications(deviceToken);
+      PushizoIos.RegisteredForRemoteNotifications(deviceToken);
 
   [Export("application:didFailToRegisterForRemoteNotificationsWithError:")]
   public void FailedToRegisterForRemoteNotifications(UIApplication application, NSError error) =>
-      HeroSignalIos.FailedToRegisterForRemoteNotifications(error);
+      PushizoIos.FailedToRegisterForRemoteNotifications(error);
   ```
 - Zengin medya, rozet ve teslimat onayı için Xcode'da bir Notification Service Extension hedefi ekleyip yerel
-  `HeroSignalExtension` (SPM) ya da `HeroSignal/Extension` (CocoaPods) ile `HeroSignalNotificationServiceExtension`
+  `PushizoExtension` (SPM) ya da `Pushizo/Extension` (CocoaPods) ile `PushizoNotificationServiceExtension`
   sınıfını kullanın (bkz. `docs/sdk/ios.md`).
 
 ## Kullanım
 
 ```csharp
-await HeroSignal.Notifications.RequestPermissionAsync(fallbackToSettings: true);
-HeroSignal.Login("user_42", identityHash: hashFromYourServer);   // identity verification açıksa hash zorunlu
-HeroSignal.User.AddTags(new Dictionary<string, string> { ["plan"] = "pro" });
-HeroSignal.User.AddAlias("crm_id", "42");
-HeroSignal.User.SetLanguage("tr");
-HeroSignal.User.AddEmail("ali@example.com");
-HeroSignal.User.AddSms("+905321234567");
+await Pushizo.Notifications.RequestPermissionAsync(fallbackToSettings: true);
+Pushizo.Login("user_42", identityHash: hashFromYourServer);   // identity verification açıksa hash zorunlu
+Pushizo.User.AddTags(new Dictionary<string, string> { ["plan"] = "pro" });
+Pushizo.User.AddAlias("crm_id", "42");
+Pushizo.User.SetLanguage("tr");
+Pushizo.User.AddEmail("ali@example.com");
+Pushizo.User.AddSms("+905321234567");
 
 // Bildirim tercihleri (ADR-0019 §4): kategori × kanal (Channel null = tüm kanallar)
-var prefs = await HeroSignal.User.GetPreferencesAsync();
+var prefs = await Pushizo.User.GetPreferencesAsync();
 foreach (var category in prefs.Categories) Console.WriteLine(category.LocalizedName("tr"));
-await HeroSignal.User.SetPreferencesAsync(new[]
+await Pushizo.User.SetPreferencesAsync(new[]
 {
     new PreferenceInput("promo", OptedIn: false),
     new PreferenceInput("news", OptedIn: true, Channel: "email"),
 });
 
-HeroSignal.User.PushSubscription.Changed += (_, e) => Console.WriteLine(e.Current.Id);
-HeroSignal.Notifications.PermissionChanged += (_, e) => Console.WriteLine(e.Permission); // yerel izin gözlemcisinden
-HeroSignal.Notifications.Clicked += (_, e) => Navigate(e.Url);
-HeroSignal.Notifications.ForegroundWillDisplay += (_, e) =>
+Pushizo.User.PushSubscription.Changed += (_, e) => Console.WriteLine(e.Current.Id);
+Pushizo.Notifications.PermissionChanged += (_, e) => Console.WriteLine(e.Permission); // yerel izin gözlemcisinden
+Pushizo.Notifications.Clicked += (_, e) => Navigate(e.Url);
+Pushizo.Notifications.ForegroundWillDisplay += (_, e) =>
 {
     if (IsChatOpen) e.PreventDefault();   // eşzamanlı; gerekirse sonra e.Display()
 };
 
-HeroSignal.InAppMessages.AddTrigger("level", "gold");
-HeroSignal.InAppMessages.SetScreen("cart");
-HeroSignal.InAppMessages.Clicked += (_, e) => Console.WriteLine(e.ActionId);
-HeroSignal.InAppMessages.DidDisplay += (_, e) => Console.WriteLine(e.Message.Id);
+Pushizo.InAppMessages.AddTrigger("level", "gold");
+Pushizo.InAppMessages.SetScreen("cart");
+Pushizo.InAppMessages.Clicked += (_, e) => Console.WriteLine(e.ActionId);
+Pushizo.InAppMessages.DidDisplay += (_, e) => Console.WriteLine(e.Message.Id);
 
-var page = await HeroSignal.Inbox.ListAsync(limit: 20);
-await HeroSignal.Inbox.MarkReadAsync(page.Items[0].Id);
-await HeroSignal.Inbox.MarkAllReadAsync();
-await HeroSignal.Inbox.ArchiveAsync(page.Items[0].Id);
+var page = await Pushizo.Inbox.ListAsync(limit: 20);
+await Pushizo.Inbox.MarkReadAsync(page.Items[0].Id);
+await Pushizo.Inbox.MarkAllReadAsync();
+await Pushizo.Inbox.ArchiveAsync(page.Items[0].Id);
 
-HeroSignal.Session.SendEvent("purchase", new Dictionary<string, object?> { ["sku"] = "A1" }, value: 129.9);
-HeroSignal.Notifications.ClearAll();
-HeroSignal.Notifications.RemoveGroupedNotifications("orders");  // Android android_group / iOS thread-id
-HeroSignal.Notifications.RemoveNotification(42);                // Android tepsi kimliği; iOS'ta RemoveNotification("istek-kimligi")
-HeroSignal.Debug.SetLogLevel(LogLevel.Debug);
-HeroSignal.Logout();
+Pushizo.Session.SendEvent("purchase", new Dictionary<string, object?> { ["sku"] = "A1" }, value: 129.9);
+Pushizo.Notifications.ClearAll();
+Pushizo.Notifications.RemoveGroupedNotifications("orders");  // Android android_group / iOS thread-id
+Pushizo.Notifications.RemoveNotification(42);                // Android tepsi kimliği; iOS'ta RemoveNotification("istek-kimligi")
+Pushizo.Debug.SetLogLevel(LogLevel.Debug);
+Pushizo.Logout();
 ```
 
 Olaylar yerel SDK'nın iş parçacığında tetiklenir; arayüz güncellemesi için `MainThread.BeginInvokeOnMainThread`
-kullanın. Bildirim kutusu ve tercih hataları `HeroSignalException.Code` ile gelir (`NOT_READY`: abonelik/kullanıcı kaydı
+kullanın. Bildirim kutusu ve tercih hataları `PushizoException.Code` ile gelir (`NOT_READY`: abonelik/kullanıcı kaydı
 henüz tamamlanmadı; `INVALID_ARGUMENT`: yerel SDK girdiyi reddetti; diğerleri sunucu hata kodu). `SetPreferencesAsync`
 girdiyi köprüden önce doğrular (1-100 kayıt, kategori 1-64 karakter, kanal `ios_push` | `android_push` | `web_push` |
 `email` | `sms` ya da null); geçersizse `ArgumentException`.
@@ -118,31 +118,31 @@ App ayarlarında kimlik doğrulama kipi (`identity_verification_mode`) `jwt` vey
 imzalanmış kısa ömürlü bir ES256 JWT ile kimliklendirilir (ADR-0023 §9; talepler: `sub` = external_id, `aud` = app_id, `exp`/`iat` zorunlu, en çok 24 saat, yalnızca ES256).
 
 ```csharp
-HeroSignal.Login("user_42", jwt: jwtFromYourServer);                         // yalnızca JWT
-HeroSignal.Login("user_42", identityHash: hmac, jwt: jwtFromYourServer);     // both kipinde ikisi birlikte
-HeroSignal.UpdateUserJwt(refreshedJwt); // süresi dolmadan yenileyin
-HeroSignal.Logout();
+Pushizo.Login("user_42", jwt: jwtFromYourServer);                         // yalnızca JWT
+Pushizo.Login("user_42", identityHash: hmac, jwt: jwtFromYourServer);     // both kipinde ikisi birlikte
+Pushizo.UpdateUserJwt(refreshedJwt); // süresi dolmadan yenileyin
+Pushizo.Logout();
 ```
 
 - JWT yerel SDK'da identity hash ile aynı kalıcı depoda saklanır ve tüm `/sdk/v1/...` isteklerinde
   `Authorization: Bearer <jwt>` başlığıyla gider; gövdeye/URL'ye yazılmaz, loglanmaz. `Logout` belirteci siler.
 - `/config` yanıtında `identity_verification_required` true ise login öncesi kanıt denetlenir: `jwt` kipinde JWT, `hmac`
-  kipinde `identityHash` zorunludur, `both` kipinde biri yeter; eksikse `Login` `HeroSignalException` (`NOT_READY`)
+  kipinde `identityHash` zorunludur, `both` kipinde biri yeter; eksikse `Login` `PushizoException` (`NOT_READY`)
   fırlatır. Alan gelmeyen eski sunucularda kip `hmac` sayılır; mevcut `Login(id, identityHash)` çağrıları aynen çalışır.
-- `UpdateUserJwt` giriş yapılmamışsa `HeroSignalException` (`NOT_READY`), boş belirteçte `ArgumentException` fırlatır;
+- `UpdateUserJwt` giriş yapılmamışsa `PushizoException` (`NOT_READY`), boş belirteçte `ArgumentException` fırlatır;
   başarıda kuyrukta bekleyen işlemler yeni belirteçle yeniden denenir.
 
 ### Live Activities (iOS)
 
-Köprü, iOS SDK'nın genel türü `HeroSignalDefaultLiveActivityAttributes`'ı kullanır (ADR-0024). Dashboard/API'de Live
-Activity türü adı tam olarak `HeroSignalDefaultLiveActivityAttributes` olmalıdır.
+Köprü, iOS SDK'nın genel türü `PushizoDefaultLiveActivityAttributes`'ı kullanır (ADR-0024). Dashboard/API'de Live
+Activity türü adı tam olarak `PushizoDefaultLiveActivityAttributes` olmalıdır.
 
 ```csharp
 // Initialize'dan sonra, uygulama her açıldığında: push-to-start (iOS 17.2+) ve güncelleme belirteçleri kaydedilir.
-await HeroSignal.LiveActivities.SetupDefaultLiveActivityAsync();
+await Pushizo.LiveActivities.SetupDefaultLiveActivityAsync();
 
 // Yerel başlatma (iOS 16.1+); sunucu sonraki update/end çağrılarını bu kimlikle yapar.
-await HeroSignal.LiveActivities.StartDefaultLiveActivityAsync(
+await Pushizo.LiveActivities.StartDefaultLiveActivityAsync(
     "order_42",
     new Dictionary<string, object> { ["title"] = "Sipariş #42" },
     new Dictionary<string, object> { ["status"] = "Hazırlanıyor", ["eta"] = 15 });
@@ -153,11 +153,11 @@ await HeroSignal.LiveActivities.StartDefaultLiveActivityAsync(
   import ActivityKit
   import SwiftUI
   import WidgetKit
-  import HeroSignalExtension // CocoaPods: pod 'HeroSignal/Extension' + import HeroSignal
+  import PushizoExtension // CocoaPods: pod 'Pushizo/Extension' + import Pushizo
 
   struct OrderLiveActivity: Widget {
       var body: some WidgetConfiguration {
-          ActivityConfiguration(for: HeroSignalDefaultLiveActivityAttributes.self) { context in
+          ActivityConfiguration(for: PushizoDefaultLiveActivityAttributes.self) { context in
               VStack {
                   Text(context.attributes.data["title"]?.stringValue ?? "")
                   Text(context.state.data["status"]?.description ?? "")
@@ -170,19 +170,19 @@ await HeroSignal.LiveActivities.StartDefaultLiveActivityAsync(
       }
   }
   ```
-  SPM'de widget hedefine `HeroSignalExtension` ürünü eklenir (`import HeroSignalExtension`); CocoaPods'ta
-  `HeroSignal/Extension` alt spec'i (`import HeroSignal`).
+  SPM'de widget hedefine `PushizoExtension` ürünü eklenir (`import PushizoExtension`); CocoaPods'ta
+  `Pushizo/Extension` alt spec'i (`import Pushizo`).
 - Uygulamanın `Platforms/iOS/Info.plist` dosyasına `NSSupportsLiveActivities` = `YES` ekleyin.
-- Sunucu: `POST /v1/apps/{appId}/live-activities/HeroSignalDefaultLiveActivityAttributes/start|update|end`
+- Sunucu: `POST /v1/apps/{appId}/live-activities/PushizoDefaultLiveActivityAttributes/start|update|end`
   (`attributes` ve `content_state` düz nesnedir; widget'ta `data` sözlüğünden okunur). Push-to-start iOS 17.2+,
   yerel başlatma iOS 16.1+ gerektirir.
 - Köprü girdiyi doğrular: `activityId` 1-100 karakter (harf, rakam, `_ . : -`), anahtar 1-64 karakter, değer metin
-  (en çok 4000 karakter), sonlu sayı veya bool; `attributes` içinde `herosignal` anahtarı ayrılmıştır. Geçersizse
-  `HeroSignalException` (`INVALID_ARGUMENT`).
-- Hatalar `HeroSignalException.Code` taşır: `PLATFORM_NOT_SUPPORTED` (iOS 16.1 öncesi, Android ve diğer hedefler),
+  (en çok 4000 karakter), sonlu sayı veya bool; `attributes` içinde `pushizo` anahtarı ayrılmıştır. Geçersizse
+  `PushizoException` (`INVALID_ARGUMENT`).
+- Hatalar `PushizoException.Code` taşır: `PLATFORM_NOT_SUPPORTED` (iOS 16.1 öncesi, Android ve diğer hedefler),
   `NOT_READY` (yerel SDK başlatılmadı), `INVALID_ARGUMENT`, `LIVE_ACTIVITY_FAILED` (Live Activities kapalı,
   `NSSupportsLiveActivities` eksik vb.).
-- Tip-güvenli kendi `ActivityAttributes` türünüz için native tarafta `HeroSignal.LiveActivities.register(MyAttributes.self)`
+- Tip-güvenli kendi `ActivityAttributes` türünüz için native tarafta `Pushizo.LiveActivities.register(MyAttributes.self)`
   çağırın (ayrıntı: `docs/sdk/ios.md` "Live Activities").
 
 ### HTML in-app ve carousel
@@ -202,11 +202,11 @@ kuyruğuyla yapılır.
 
 ```csharp
 // İzin yoksa önce açıklama diyaloğu (verilmezse SDK'nın Türkçe/İngilizce varsayılan metni), sonra sistem istemi.
-var granted = await HeroSignal.Location.RequestPermissionAsync("Yakındaki mağazaları göstermek için konumunuzu kullanırız.");
-if (granted) HeroSignal.Location.SetShared(true);   // tercih kalıcıdır
+var granted = await Pushizo.Location.RequestPermissionAsync("Yakındaki mağazaları göstermek için konumunuzu kullanırız.");
+if (granted) Pushizo.Location.SetShared(true);   // tercih kalıcıdır
 
-bool shared = HeroSignal.Location.IsShared;          // paylaşım açık mı (izin durumundan bağımsız)
-HeroSignal.Location.SetShared(false);               // sunucuya location: null → konum ve rıza kaydı silinir
+bool shared = Pushizo.Location.IsShared;          // paylaşım açık mı (izin durumundan bağımsız)
+Pushizo.Location.SetShared(false);               // sunucuya location: null → konum ve rıza kaydı silinir
 ```
 
 - `RequestPermissionAsync` izin varsa veya verildiyse `true`; reddedildi/kısıtlı, açıklamada "Şimdi değil" seçildi ya
@@ -220,8 +220,8 @@ HeroSignal.Location.SetShared(false);               // sunucuya location: null �
   <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
   ```
   Manifest'te hiçbiri yoksa ya da etkin Activity yoksa sonuç `false` olur. Sistem izni yerel SDK'nın istek koduyla
-  (`HeroSignal.Location.PERMISSION_REQUEST_CODE` = `0x484C`) istenir; köprü sonucu `UseHeroSignal` yaşam döngüsü olayından
-  alır (yalnızca `HeroSignal.Initialize` kullanıyorsanız bildirim izniyle aynı `HeroSignalAndroid.OnRequestPermissionsResult`
+  (`Pushizo.Location.PERMISSION_REQUEST_CODE` = `0x484C`) istenir; köprü sonucu `UsePushizo` yaşam döngüsü olayından
+  alır (yalnızca `Pushizo.Initialize` kullanıyorsanız bildirim izniyle aynı `PushizoAndroid.OnRequestPermissionsResult`
   çağrısı yeterlidir).
 - İzin yoksa konum sessizce gönderilmez; `RequiresPrivacyConsent` açıkken `SetConsentGiven(true)` gelene kadar hiç
   gönderilmez.
@@ -233,12 +233,12 @@ HeroSignal.Location.SetShared(false);               // sunucuya location: null �
 ## Mimari
 
 ```
-HeroSignal (C# cephe, doğrulama, olaylar)  ──  BridgePlatform (JSON sözleşmesi, ortak)
+Pushizo (C# cephe, doğrulama, olaylar)  ──  BridgePlatform (JSON sözleşmesi, ortak)
         │                                          │
-        ├─ Android: HeroSignal.Maui.Android.Binding → com.herosignal.maui.HeroSignalMauiBridge (Kotlin, native/android/bridge)
-        │                                             → com.herosignal.sdk.HeroSignal (sdk/android)
-        └─ iOS:     HeroSignal.Maui.iOS.Binding     → HSMauiBridge (@objc Swift, src/HeroSignal.Maui.iOS.Binding/native)
-                                                      → HeroSignal (sdk/ios)
+        ├─ Android: Pushizo.Maui.Android.Binding → com.pushizo.maui.PushizoMauiBridge (Kotlin, native/android/bridge)
+        │                                             → com.pushizo.sdk.Pushizo (sdk/android)
+        └─ iOS:     Pushizo.Maui.iOS.Binding     → HSMauiBridge (@objc Swift, src/Pushizo.Maui.iOS.Binding/native)
+                                                      → Pushizo (sdk/ios)
 ```
 
 Yerel SDK'ların Kotlin `object`/lambda/`Result` ve Swift `enum`/async API'leri doğrudan bağlanamadığı için her
@@ -251,15 +251,15 @@ olarak gelir; köprüler ön plana dönüşte kendi izin yoklamasını yapmaz.
 
 ```bash
 # Paylaşılan katman + birim testleri (iş yükü gerekmez)
-dotnet test sdk/maui/tests/HeroSignal.Maui.Tests -p:HeroSignalIncludeAndroid=false
+dotnet test sdk/maui/tests/Pushizo.Maui.Tests -p:PushizoIncludeAndroid=false
 
 # Android (maui-android iş yükü, JDK 17, ANDROID_HOME, PATH'te gradle 8.x)
-dotnet build sdk/maui/src/HeroSignal.Maui -f net9.0-android
+dotnet build sdk/maui/src/Pushizo.Maui -f net9.0-android
 
 # iOS (macOS + Xcode 15+ + maui-ios iş yükü; xcframework otomatik üretilir)
-dotnet build sdk/maui/src/HeroSignal.Maui -f net9.0-ios
+dotnet build sdk/maui/src/Pushizo.Maui -f net9.0-ios
 ```
 
-Android AAR'ları `src/HeroSignal.Maui.Android.Binding/build/native`, iOS xcframework'ü
-`src/HeroSignal.Maui.iOS.Binding/build/native` altına üretilir; `sdk/android` ve `sdk/ios` altına çıktı yazılmaz.
+Android AAR'ları `src/Pushizo.Maui.Android.Binding/build/native`, iOS xcframework'ü
+`src/Pushizo.Maui.iOS.Binding/build/native` altına üretilir; `sdk/android` ve `sdk/ios` altına çıktı yazılmaz.
 Örnek uygulama: `examples/maui-app`.
