@@ -1,34 +1,34 @@
 <Project>
-  <!-- HeroSignal .NET MAUI SDK: tüm projelerde ortak sürüm ve derleme ayarları. -->
+  <!-- Pushizo .NET MAUI SDK: tüm projelerde ortak sürüm ve derleme ayarları. -->
   <PropertyGroup>
-    <HeroSignalVersion>0.1.0</HeroSignalVersion>
+    <PushizoVersion>0.1.0</PushizoVersion>
     <!-- Yerel Android SDK'sının (sdk/android) yayın sürümü; binding paketi bu sürümü sarar. -->
-    <HeroSignalNativeAndroidVersion>0.1.0</HeroSignalNativeAndroidVersion>
+    <PushizoNativeAndroidVersion>0.1.0</PushizoNativeAndroidVersion>
     <!-- MAUI paket sürümleri hedef .NET sürümüne göre seçilir (MAUI 9 paketleri net8.0 hedeflerini içermez). -->
     <MauiVersion Condition="'$(MauiVersion)' == '' and $(TargetFramework.StartsWith('net8.0'))">8.0.100</MauiVersion>
     <MauiVersion Condition="'$(MauiVersion)' == ''">9.0.120</MauiVersion>
-    <Version>$(HeroSignalVersion)</Version>
+    <Version>$(PushizoVersion)</Version>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Authors>HeroSignal</Authors>
-    <Company>HeroSignal</Company>
+    <Authors>Pushizo</Authors>
+    <Company>Pushizo</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/exec0de/herosignal</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/exec0de/herosignal</RepositoryUrl>
-    <PackageTags>herosignal;push;notifications;in-app;inbox;maui;android;ios</PackageTags>
+    <PackageProjectUrl>https://github.com/exec0de/pushizo</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/exec0de/pushizo</RepositoryUrl>
+    <PackageTags>pushizo;push;notifications;in-app;inbox;maui;android;ios</PackageTags>
     <!-- iOS hedefi yalnızca macOS'ta (Xcode + maui-ios iş yükü) ya da açıkça istendiğinde derlenir. -->
-    <HeroSignalIncludeIos Condition="'$(HeroSignalIncludeIos)' == '' and $([MSBuild]::IsOSPlatform('osx'))">true</HeroSignalIncludeIos>
+    <PushizoIncludeIos Condition="'$(PushizoIncludeIos)' == '' and $([MSBuild]::IsOSPlatform('osx'))">true</PushizoIncludeIos>
     <!--
       Android hedefi varsayılan olarak derlenir (maui-android iş yükü + JDK 17 + Android SDK gerekir). İş yükü olmayan
-      makinelerde (ör. yalnızca paylaşılan katmanın birim testleri) -p:HeroSignalIncludeAndroid=false verilir.
+      makinelerde (ör. yalnızca paylaşılan katmanın birim testleri) -p:PushizoIncludeAndroid=false verilir.
     -->
-    <HeroSignalIncludeAndroid Condition="'$(HeroSignalIncludeAndroid)' == ''">true</HeroSignalIncludeAndroid>
+    <PushizoIncludeAndroid Condition="'$(PushizoIncludeAndroid)' == ''">true</PushizoIncludeAndroid>
     <!-- net9.0 hedefleri yalnızca .NET 9+ SDK ile eklenir (.NET 8 SDK'sı net9.0 hedefini geri yükleyemez). -->
-    <HeroSignalNet9 Condition="'$(NETCoreSdkVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '9.0'))">true</HeroSignalNet9>
-    <HeroSignalAndroidTargets>net8.0-android</HeroSignalAndroidTargets>
-    <HeroSignalAndroidTargets Condition="'$(HeroSignalNet9)' == 'true'">net8.0-android;net9.0-android</HeroSignalAndroidTargets>
-    <HeroSignalIosTargets>net8.0-ios</HeroSignalIosTargets>
-    <HeroSignalIosTargets Condition="'$(HeroSignalNet9)' == 'true'">net8.0-ios;net9.0-ios</HeroSignalIosTargets>
+    <PushizoNet9 Condition="'$(NETCoreSdkVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '9.0'))">true</PushizoNet9>
+    <PushizoAndroidTargets>net8.0-android</PushizoAndroidTargets>
+    <PushizoAndroidTargets Condition="'$(PushizoNet9)' == 'true'">net8.0-android;net9.0-android</PushizoAndroidTargets>
+    <PushizoIosTargets>net8.0-ios</PushizoIosTargets>
+    <PushizoIosTargets Condition="'$(PushizoNet9)' == 'true'">net8.0-ios;net9.0-ios</PushizoIosTargets>
   </PropertyGroup>
 </Project>

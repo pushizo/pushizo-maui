@@ -1,0 +1,66 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pushizo .NET MAUI SDK (NuGet: Pushizo.Maui).
+    Hedefler:
+      net8.0 / net9.0            → platformdan bağımsız katman (Windows/MacCatalyst uygulamalarında çağrılar etkisizdir;
+                                   birim testleri bu hedefle çalışır)
+      net8.0-android / net9.0-android → yerel Android SDK'sı (Pushizo.Maui.Android.Binding üzerinden)
+      net8.0-ios / net9.0-ios    → yerel iOS SDK'sı (Pushizo.Maui.iOS.Binding üzerinden; yalnızca macOS'ta derlenir)
+    Android iş yükü olmayan makinede: dotnet build -p:PushizoIncludeAndroid=false
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(PushizoNet9)' == 'true'">$(TargetFrameworks);net9.0</TargetFrameworks>
+    <TargetFrameworks Condition="'$(PushizoIncludeAndroid)' == 'true'">$(TargetFrameworks);$(PushizoAndroidTargets)</TargetFrameworks>
+    <TargetFrameworks Condition="'$(PushizoIncludeIos)' == 'true'">$(TargetFrameworks);$(PushizoIosTargets)</TargetFrameworks>
+    <RootNamespace>PushizoSdk.Maui</RootNamespace>
+    <AssemblyName>Pushizo.Maui</AssemblyName>
+    <PackageId>Pushizo.Maui</PackageId>
+    <Description>Pushizo .NET MAUI SDK: push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, e-posta ve SMS abonelikleri. Yerel Pushizo Android ve iOS SDK'larını sarar.</Description>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Public üyelerin bir kısmı kendini açıklayan adlara sahip; eksik XML yorumu uyarısı derlemeyi kirletmesin. -->
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">true</IsAotCompatible>
+    <PushizoPlatform>none</PushizoPlatform>
+    <PushizoPlatform Condition="$(TargetFramework.Contains('-android'))">android</PushizoPlatform>
+    <PushizoPlatform Condition="$(TargetFramework.Contains('-ios'))">ios</PushizoPlatform>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(PushizoPlatform)' == 'android'">
+    <SupportedOSPlatformVersion>23.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(PushizoPlatform)' == 'ios'">
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      MauiAppBuilder.UsePushizo(), yaşam döngüsü olayları ve Platform.CurrentActivity için MAUI çekirdek paketi.
+      Kütüphane UseMaui kullanmaz; böylece yalnızca android/ios iş yükleri yeterlidir.
+    -->
+    <PackageReference Include="Microsoft.Maui.Core" Version="$(MauiVersion)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Pushizo.Maui.Tests" />
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <!-- Platform klasörleri yalnızca ilgili hedefte derlenir. -->
+  <ItemGroup Condition="'$(PushizoPlatform)' != 'android'">
+    <Compile Remove="Platforms\Android\**\*.cs" />
+    <None Include="Platforms\Android\**\*.cs" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PushizoPlatform)' != 'ios'">
+    <Compile Remove="Platforms\iOS\**\*.cs" />
+    <None Include="Platforms\iOS\**\*.cs" />
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(PushizoPlatform)' == 'android'">
+    <ProjectReference Include="..\Pushizo.Maui.Android.Binding\Pushizo.Maui.Android.Binding.csproj" />
+  </ItemGroup>
+  <ItemGroup Condition="'$(PushizoPlatform)' == 'ios'">
+    <ProjectReference Include="..\Pushizo.Maui.iOS.Binding\Pushizo.Maui.iOS.Binding.csproj" />
+  </ItemGroup>
+</Project>

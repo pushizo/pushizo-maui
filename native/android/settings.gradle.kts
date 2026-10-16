@@ -1,6 +1,6 @@
-// HeroSignal .NET MAUI Android köprüsü: yerel SDK (sdk/android/herosignal) kaynaktan bu derlemeye dahil edilir;
+// Pushizo .NET MAUI Android köprüsü: yerel SDK (sdk/android/pushizo) kaynaktan bu derlemeye dahil edilir;
 // köprü modülü (bridge) ona bağımlıdır. Çıktılar init betiğiyle depo dışına yönlendirilir
-// (bkz. sdk/maui/tools/herosignal-native-out.init.gradle).
+// (bkz. sdk/maui/tools/pushizo-native-out.init.gradle).
 pluginManagement {
     repositories {
         google()
@@ -16,10 +16,10 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "herosignal-maui-native"
+rootProject.name = "pushizo-maui-native"
 
-include(":herosignal")
-project(":herosignal").projectDir = file("../../../android/herosignal")
+include(":pushizo")
+project(":pushizo").projectDir = file("../../../android/pushizo")
 
-include(":herosignal-maui-bridge")
-project(":herosignal-maui-bridge").projectDir = file("bridge")
+include(":pushizo-maui-bridge")
+project(":pushizo-maui-bridge").projectDir = file("bridge")

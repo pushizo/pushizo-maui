@@ -1,0 +1,44 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Pushizo iOS SDK'sı için .NET iOS binding'i. Yerel Swift SDK'sı (sdk/ios) @objc yüzeyi sunmadığından küçük bir
+    Swift cephesi (native/Sources/PushizoMauiBridge/HSMauiBridge.swift) dinamik framework olarak derlenir ve bağlanır.
+    xcframework yoksa derleme sırasında native/build-xcframework.sh ile bu projenin build/native klasörüne üretilir
+    (macOS + Xcode 15+). Hazır framework kullanmak için: -p:PushizoIosXcframework=<yol>.
+  -->
+  <PropertyGroup>
+    <TargetFrameworks>$(PushizoIosTargets)</TargetFrameworks>
+    <SupportedOSPlatformVersion>15.0</SupportedOSPlatformVersion>
+    <IsBindingProject>true</IsBindingProject>
+    <NoBindingEmbedding>true</NoBindingEmbedding>
+    <RootNamespace>PushizoSdk.Native.iOS</RootNamespace>
+    <AssemblyName>Pushizo.Maui.iOS.Binding</AssemblyName>
+    <PackageId>Pushizo.Maui.iOS.Binding</PackageId>
+    <Description>Pushizo iOS SDK'sı için .NET iOS binding'i (@objc Swift cephesi). Doğrudan değil, Pushizo.Maui üzerinden kullanılır.</Description>
+    <IsPackable>true</IsPackable>
+    <NoWarn>$(NoWarn);CS1591</NoWarn>
+    <PushizoNativeDir>$(MSBuildProjectDirectory)/build/native</PushizoNativeDir>
+    <PushizoIosXcframework Condition="'$(PushizoIosXcframework)' == ''">$(PushizoNativeDir)/PushizoMauiBridge.xcframework</PushizoIosXcframework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ObjcBindingApiDefinition Include="ApiDefinition.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <NativeReference Include="$(PushizoIosXcframework)">
+      <Kind>Framework</Kind>
+      <SmartLink>false</SmartLink>
+      <Frameworks>Foundation UIKit UserNotifications</Frameworks>
+    </NativeReference>
+  </ItemGroup>
+
+  <Target Name="PushizoBuildXcframework" BeforeTargets="PrepareForBuild;_PrepareNativeReferences" Condition="!Exists('$(PushizoIosXcframework)')">
+    <Message Importance="high" Text="Pushizo: iOS köprü framework'ü üretiliyor" />
+    <Exec Command="&quot;$(MSBuildProjectDirectory)/native/build-xcframework.sh&quot; &quot;$(PushizoNativeDir)&quot;" />
+    <Error Condition="!Exists('$(PushizoIosXcframework)')" Text="Pushizo: xcframework üretilemedi: $(PushizoIosXcframework)" />
+  </Target>
+
+  <Target Name="PushizoCleanXcframework" AfterTargets="Clean">
+    <RemoveDir Directories="$(PushizoNativeDir)" />
+  </Target>
+</Project>

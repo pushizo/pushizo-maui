@@ -5,7 +5,7 @@ plugins {
 }
 
 android {
-    namespace = "com.herosignal.maui"
+    namespace = "com.pushizo.maui"
     compileSdk = 35
 
     defaultConfig {
@@ -24,6 +24,6 @@ android {
 
 dependencies {
     // Yerel SDK ayrı AAR olarak pakete girer (binding projesinde Bind=false); burada yalnızca derleme bağımlılığıdır.
-    compileOnly(project(":herosignal"))
+    compileOnly(project(":pushizo"))
     compileOnly("androidx.core:core-ktx:1.15.0")
 }

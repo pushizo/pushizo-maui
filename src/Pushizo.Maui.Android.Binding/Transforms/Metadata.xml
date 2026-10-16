@@ -1,0 +1,4 @@
+<metadata>
+  <!-- Köprü Java paketi → .NET ad alanı. Yerel SDK AAR'ı (com.pushizo.sdk) Bind=false ile bağlanmaz. -->
+  <attr path="/api/package[@name='com.pushizo.maui']" name="managedName">PushizoSdk.Native.Android</attr>
+</metadata>
