@@ -61,6 +61,9 @@ internal interface IPushizoPlatform
     Task InboxArchiveAsync(string id);
     Task<int> InboxUnreadCountAsync();
 
+    // Canlı sohbet (ADR-0040): yöntem adı + JSON argümanları yerel SDK'ya iletilir (bkz. INativeBridge.ChatCall)
+    Task<string?> ChatCallAsync(string method, string argsJson);
+
     // Oturum
     void SendEvent(string name, Dictionary<string, object?> properties, double? value);
 
@@ -85,6 +88,8 @@ internal interface IPushizoEventSink
     void OnPushSubscriptionChanged(PushSubscriptionState state);
     void OnInAppClicked(InAppMessageClickedEventArgs args);
     void OnInAppLifecycle(InAppLifecyclePhase phase, InAppMessage message);
+    void OnChatEvent(ChatEventArgs args);
+    void OnChatOpened(ChatOpenedEventArgs args);
 }
 
 internal enum InAppLifecyclePhase

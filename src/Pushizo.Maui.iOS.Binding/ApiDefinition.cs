@@ -173,6 +173,10 @@ namespace PushizoSdk.Native.iOS
         void UpdateInAppPaused (bool paused);
 
         [Static]
+        [Export ("chatCall:argsJson:completion:")]
+        void ChatCall (string method, string argsJson, HSMauiResultHandler completion);
+
+        [Static]
         [Export ("inboxListWithLimit:cursor:completion:")]
         void InboxList (nint limit, [NullAllowed] string cursor, HSMauiResultHandler completion);
 

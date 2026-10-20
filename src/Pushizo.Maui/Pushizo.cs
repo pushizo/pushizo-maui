@@ -12,6 +12,8 @@ namespace PushizoSdk.Maui;
 /// Pushizo.User.AddTag("plan", "pro");
 /// Pushizo.InAppMessages.AddTrigger("level", "gold");
 /// var page = await Pushizo.Inbox.ListAsync(limit: 20);
+/// await Pushizo.Chat.StartAsync();
+/// Pushizo.Chat.EventReceived += (_, e) => { if (e.Type == ChatEventType.Message) Show(e.Message!); };
 /// </code>
 /// </summary>
 public static class Pushizo
@@ -36,6 +38,8 @@ public static class Pushizo
     public static NotificationsManager Notifications { get; } = new();
     public static InAppMessagesManager InAppMessages { get; } = new();
     public static InboxManager Inbox { get; } = new();
+    /// <summary>Canlı sohbet (ADR-0040).</summary>
+    public static ChatManager Chat { get; } = new();
     public static SessionManager Session { get; } = new();
     public static LiveActivitiesManager LiveActivities { get; } = new();
     public static LocationManager Location { get; } = new();
@@ -126,6 +130,7 @@ public static class Pushizo
             User.PushSubscription.Reset();
             Notifications.Reset();
             InAppMessages.Reset();
+            Chat.Reset();
             Debug.Reset();
             SdkLog.Level = LogLevel.Warn;
         }
@@ -162,5 +167,9 @@ public static class Pushizo
         public void OnInAppClicked(InAppMessageClickedEventArgs args) => InAppMessages.DispatchClicked(args);
 
         public void OnInAppLifecycle(InAppLifecyclePhase phase, InAppMessage message) => InAppMessages.DispatchLifecycle(phase, message);
+
+        public void OnChatEvent(ChatEventArgs args) => Chat.Dispatch(args);
+
+        public void OnChatOpened(ChatOpenedEventArgs args) => Chat.DispatchOpened(args);
     }
 }
