@@ -14,7 +14,7 @@
     <Authors>Pushizo</Authors>
     <Company>Pushizo</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-    <PackageProjectUrl>https://github.com/exec0de/pushizo</PackageProjectUrl>
+    <PackageProjectUrl>https://docs.pushizo.com/docs/sdk/maui</PackageProjectUrl>
     <RepositoryUrl>https://github.com/exec0de/pushizo</RepositoryUrl>
     <PackageTags>pushizo;push;notifications;in-app;inbox;maui;android;ios</PackageTags>
     <!-- iOS hedefi yalnızca macOS'ta (Xcode + maui-ios iş yükü) ya da açıkça istendiğinde derlenir. -->
