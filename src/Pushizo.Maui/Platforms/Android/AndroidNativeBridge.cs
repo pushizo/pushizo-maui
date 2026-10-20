@@ -139,6 +139,9 @@ internal sealed class AndroidNativeBridge : INativeBridge
             rationale,
             new PermissionCallback(completion));
 
+    public void ChatCall(string method, string argsJson, NativeResult result) =>
+        PushizoMauiBridge.ChatCall(method, argsJson, new ResultCallback(result));
+
     public void ForegroundPreventDefault(string eventId) => PushizoMauiBridge.ForegroundPreventDefault(eventId);
 
     public void ForegroundDisplay(string eventId) => PushizoMauiBridge.ForegroundDisplay(eventId);

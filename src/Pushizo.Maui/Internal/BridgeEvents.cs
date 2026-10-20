@@ -11,6 +11,8 @@ namespace PushizoSdk.Maui.Internal;
 /// <item><c>permission</c>: <c>{"permission"}</c> — yerel SDK izin gözlemcisinden (yalnızca gerçek değişiklikte)</item>
 /// <item><c>inAppClick</c>: <c>{"messageId","actionId","url"}</c></item>
 /// <item><c>inAppLifecycle</c>: <c>{"event":"willDisplay|didDisplay|willDismiss|didDismiss","messageId","json"}</c></item>
+/// <item><c>chat</c>: <c>{"type":"message|typing|read|unread|conversation|connection|error",…}</c> (canlı sohbet)</item>
+/// <item><c>chatOpen</c>: <c>{"conversationId","seq"}</c> — sohbet bildirimine tıklama</item>
 /// </list>
 /// Bilinmeyen tür (daha yeni yerel köprü) yok sayılır.
 /// </summary>
@@ -22,6 +24,8 @@ internal static class BridgeEvents
     public const string Permission = "permission";
     public const string InAppClick = "inAppClick";
     public const string InAppLifecycle = "inAppLifecycle";
+    public const string Chat = "chat";
+    public const string ChatOpen = "chatOpen";
 
     public static void Dispatch(IPushizoEventSink sink, string type, string json, INativeBridge bridge)
     {
@@ -57,6 +61,12 @@ internal static class BridgeEvents
                 if (phase is { } p) sink.OnInAppLifecycle(p, BridgeJson.ParseInAppMessage(json));
                 break;
             }
+            case Chat:
+                if (ChatJson.ParseEvent(json) is { } chat) sink.OnChatEvent(chat);
+                break;
+            case ChatOpen:
+                sink.OnChatOpened(ChatJson.ParseOpened(json));
+                break;
             default:
                 SdkLog.Write(LogLevel.Debug, $"bilinmeyen yerel olay türü yok sayıldı: {type}");
                 break;

@@ -70,6 +70,13 @@ public final class HSMauiBridge: NSObject {
                 emit("inAppClick", ["messageId": event.messageId, "actionId": event.actionId, "url": event.url ?? NSNull()])
             }
             Pushizo.InAppMessages.addLifecycleListener(lifecycleRelay)
+            // Canlı sohbet olayları → `chat`; sohbet bildirimi tıklaması → `chatOpen` (C# katmanı bekletir).
+            Pushizo.Chat.addListener { event in
+                var payload = event.payload
+                payload["type"] = event.type
+                emit("chat", payload)
+            }
+            Pushizo.Chat.addOpenListener { info in emit("chatOpen", info.dictionary) }
             // Yerel SDK izin gözlemcisi → `permission` olayı (`{"permission":bool}`): requestPermission sonrası ve uygulama
             // yeniden etkinleştiğinde (izin Ayarlar'dan değişmiş olabilir) etkin izin değiştiyse çağrılır.
             Pushizo.Notifications.addPermissionObserver { granted in
@@ -259,6 +266,64 @@ public final class HSMauiBridge: NSObject {
     public static func updateInAppPaused(_ paused: Bool) { onMain { Pushizo.InAppMessages.paused = paused } }
 
     // MARK: Bildirim kutusu
+
+    // MARK: - Canlı sohbet (ADR-0040)
+
+    /// Sohbet çağrıları tek seçiciden (Android `chatCall` ile aynı yöntem adları ve JSON biçimleri).
+    @objc(chatCall:argsJson:completion:)
+    public static func chatCall(_ method: String, argsJson: String, completion: @escaping (String?, String?, String?) -> Void) {
+        let a = (jsonObject(argsJson) as? [String: Any]) ?? [:]
+        func str(_ key: String) -> String? {
+            guard let v = a[key] as? String, !v.trimmingCharacters(in: .whitespaces).isEmpty else { return nil }
+            return v
+        }
+        func int(_ key: String) -> Int? { (a[key] as? NSNumber)?.intValue }
+        func json(_ dict: [String: Any]) -> String? { jsonString(dict) }
+        switch method {
+        case "start":
+            inbox(completion) { json(try await Pushizo.Chat.start(name: str("name"), email: str("email"), language: str("language")).dictionary) }
+        case "getConfig":
+            inbox(completion) { json(try await Pushizo.Chat.getConfig(language: str("language")).dictionary) }
+        case "getConversation":
+            inbox(completion) { json(try await Pushizo.Chat.getConversation().dictionary) }
+        case "getMessages":
+            inbox(completion) { json(try await Pushizo.Chat.getMessages(afterSeq: int("afterSeq"), beforeSeq: int("beforeSeq"), limit: int("limit") ?? 50).dictionary) }
+        case "sendMessage":
+            guard let text = str("text") else { completion(nil, "INVALID_ARGUMENT", "text gerekli"); return }
+            inbox(completion) { json(try await Pushizo.Chat.sendMessage(text, optionId: str("optionId")).dictionary) }
+        case "sendAttachment":
+            guard let base64 = str("base64"), let data = Data(base64Encoded: base64, options: .ignoreUnknownCharacters),
+                  let fileName = str("fileName"), let mimeType = str("mimeType") else {
+                completion(nil, "INVALID_ARGUMENT", "base64, fileName ve mimeType gerekli"); return
+            }
+            inbox(completion) { json(try await Pushizo.Chat.sendAttachment(data, fileName: fileName, mimeType: mimeType, text: str("text")).dictionary) }
+        case "markRead":
+            inbox(completion) { json(["unreadCount": try await Pushizo.Chat.markRead(int("seq") ?? 0)]) }
+        case "refreshUnreadCount":
+            inbox(completion) { json(["unreadCount": try await Pushizo.Chat.refreshUnreadCount()]) }
+        case "getUnreadCount":
+            completion(json(["unreadCount": Pushizo.Chat.unreadCount]), nil, nil)
+        case "leaveOfflineMessage":
+            guard let email = str("email"), let text = str("text") else { completion(nil, "INVALID_ARGUMENT", "email ve text gerekli"); return }
+            inbox(completion) { json(try await Pushizo.Chat.leaveOfflineMessage(email: email, text: text, name: str("name")).dictionary) }
+        case "setTyping":
+            Pushizo.Chat.setTyping(a["typing"] as? Bool ?? false)
+            completion(nil, nil, nil)
+        case "startListening":
+            Pushizo.Chat.startListening()
+            completion(nil, nil, nil)
+        case "stopListening":
+            Pushizo.Chat.stopListening()
+            completion(nil, nil, nil)
+        case "attachmentUrl":
+            guard let attachmentId = str("attachmentId") else { completion(nil, "INVALID_ARGUMENT", "attachmentId gerekli"); return }
+            inbox(completion) { json(["url": try Pushizo.Chat.attachmentUrl(attachmentId, download: a["download"] as? Bool ?? false).absoluteString]) }
+        case "getVisitorId":
+            completion(json(["visitorId": Pushizo.Chat.visitorId ?? NSNull()]), nil, nil)
+        default:
+            completion(nil, "INVALID_ARGUMENT", "bilinmeyen sohbet yöntemi: \(method)")
+        }
+    }
 
     @objc(inboxListWithLimit:cursor:completion:)
     public static func inboxList(limit: Int, cursor: String?, completion: @escaping (String?, String?, String?) -> Void) {
@@ -451,6 +516,8 @@ public final class HSMauiBridge: NSObject {
                 completion(try await body(), nil, nil)
             } catch let error as HSApiError {
                 completion(nil, error.code, error.message)
+            } catch HSChatError.invalidArgument(let message) {
+                completion(nil, "INVALID_ARGUMENT", message)
             } catch let error as HSError {
                 switch error {
                 case .notInitialized: completion(nil, "NOT_INITIALIZED", "Pushizo başlatılmadı")

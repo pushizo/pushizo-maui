@@ -15,6 +15,8 @@ import androidx.core.app.ActivityCompat
 import com.pushizo.sdk.Pushizo
 import com.pushizo.sdk.HsApiException
 import com.pushizo.sdk.HsCallback
+import com.pushizo.sdk.HsChatEventAdapter
+import com.pushizo.sdk.HsChatOpenListener
 import com.pushizo.sdk.HsClickEvent
 import com.pushizo.sdk.HsForegroundEvent
 import com.pushizo.sdk.HsInAppClickEvent
@@ -109,6 +111,12 @@ object PushizoMauiBridge {
         emit("inAppClick", JSONObject().put("messageId", e.messageId).put("actionId", e.actionId).put("url", e.url ?: JSONObject.NULL))
     }
 
+    /** Canlı sohbet olayları → `chat` (`{"type":"message|typing|read|unread|conversation|connection|error",…}`). */
+    private val chatListener = HsChatEventAdapter { type, payload -> emit("chat", JSONObject(payload).put("type", type)) }
+
+    /** Sohbet bildirimine tıklama → `chatOpen` (`{"conversationId","seq"}`; C# katmanı dinleyici yokken bekletir). */
+    private val chatOpenListener = HsChatOpenListener { info -> emit("chatOpen", JSONObject(info.toMap())) }
+
     private val inAppLifecycleListener = object : HsInAppLifecycleListener {
         private fun send(event: String, e: HsInAppLifecycleEvent) =
             emit("inAppLifecycle", JSONObject().put("event", event).put("messageId", e.message.id).put("json", e.message.toJson()))
@@ -167,6 +175,8 @@ object PushizoMauiBridge {
             Pushizo.Notifications.addForegroundLifecycleListener(foregroundListener)
             Pushizo.InAppMessages.addClickListener(inAppClickListener)
             Pushizo.InAppMessages.addLifecycleListener(inAppLifecycleListener)
+            Pushizo.Chat.addListener(chatListener)
+            Pushizo.Chat.addOpenListener(chatOpenListener)
             // En son: bekleyen (uygulamayı açan) tıklama bu çağrıda iletilir.
             Pushizo.Notifications.addClickListener(clickListener)
         }
@@ -358,6 +368,48 @@ object PushizoMauiBridge {
     @JvmStatic
     fun inboxUnreadCount(result: PushizoMauiResult) =
         Pushizo.Inbox.unreadCount(reply<Int>(result) { JSONObject().put("unreadCount", it).toString() })
+
+    // --- Canlı sohbet (ADR-0040) ---
+
+    /**
+     * Sohbet çağrıları tek giriş noktasından (binding yüzeyi küçük kalsın diye). `method`: start, getConfig, getConversation,
+     * getMessages, sendMessage, sendAttachment (base64), markRead, refreshUnreadCount, getUnreadCount, leaveOfflineMessage,
+     * setTyping, startListening, stopListening, attachmentUrl, getVisitorId. Başarı JSON'u modelin camelCase sözlüğü;
+     * sayaçlar `{"unreadCount":n}`, adres `{"url"}`, kimlik `{"visitorId"}`, dönüşsüz işlemler null.
+     */
+    @JvmStatic
+    fun chatCall(method: String, argsJson: String, result: PushizoMauiResult) {
+        try {
+            val a = if (argsJson.isBlank()) JSONObject() else JSONObject(argsJson)
+            fun str(key: String): String? = if (a.has(key) && !a.isNull(key)) a.optString(key).ifBlank { null } else null
+            fun long(key: String): Long? = if (a.has(key) && !a.isNull(key)) a.optLong(key) else null
+            fun required(key: String): String = str(key) ?: throw IllegalArgumentException("$key gerekli")
+            val chat = Pushizo.Chat
+            when (method) {
+                "start" -> chat.start(str("name"), str("email"), str("language"), reply<com.pushizo.sdk.HsChatIdentifyResult>(result) { JSONObject(it.toMap()).toString() })
+                "getConfig" -> chat.getConfig(str("language"), reply<com.pushizo.sdk.HsChatConfig>(result) { JSONObject(it.toMap()).toString() })
+                "getConversation" -> chat.getConversation(reply<com.pushizo.sdk.HsChatConversationState>(result) { JSONObject(it.toMap()).toString() })
+                "getMessages" -> chat.getMessages(long("afterSeq"), long("beforeSeq"), a.optInt("limit", 50), reply<com.pushizo.sdk.HsChatMessagePage>(result) { JSONObject(it.toMap()).toString() })
+                "sendMessage" -> chat.sendMessage(required("text"), str("optionId"), reply<com.pushizo.sdk.HsChatMessage>(result) { it.toJson().toString() })
+                "sendAttachment" -> {
+                    val bytes = android.util.Base64.decode(required("base64"), android.util.Base64.DEFAULT)
+                    chat.sendAttachment(bytes, required("fileName"), required("mimeType"), str("text"), reply<com.pushizo.sdk.HsChatMessage>(result) { it.toJson().toString() })
+                }
+                "markRead" -> chat.markRead(long("seq") ?: 0L, reply<Int>(result) { JSONObject().put("unreadCount", it).toString() })
+                "refreshUnreadCount" -> chat.refreshUnreadCount(reply<Int>(result) { JSONObject().put("unreadCount", it).toString() })
+                "getUnreadCount" -> result.onResult(JSONObject().put("unreadCount", chat.unreadCount).toString(), null, null)
+                "leaveOfflineMessage" -> chat.leaveOfflineMessage(required("email"), required("text"), str("name"), reply<com.pushizo.sdk.HsChatMessage>(result) { it.toJson().toString() })
+                "setTyping" -> { chat.setTyping(a.optBoolean("typing", false)); result.onResult(null, null, null) }
+                "startListening" -> { chat.startListening(); result.onResult(null, null, null) }
+                "stopListening" -> { chat.stopListening(); result.onResult(null, null, null) }
+                "attachmentUrl" -> result.onResult(JSONObject().put("url", chat.attachmentUrl(required("attachmentId"), a.optBoolean("download", false))).toString(), null, null)
+                "getVisitorId" -> result.onResult(JSONObject().put("visitorId", chat.visitorId ?: JSONObject.NULL).toString(), null, null)
+                else -> result.onResult(null, "INVALID_ARGUMENT", "bilinmeyen sohbet yöntemi: $method")
+            }
+        } catch (e: Exception) {
+            result.onResult(null, errorCode(e), e.message ?: errorCode(e))
+        }
+    }
 
     // --- Tercihler (ADR-0019 §4) ---
 

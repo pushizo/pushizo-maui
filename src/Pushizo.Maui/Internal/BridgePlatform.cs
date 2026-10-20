@@ -136,6 +136,9 @@ internal sealed class BridgePlatform : IPushizoPlatform
     public Task<int> InboxUnreadCountAsync() =>
         Call(r => _bridge.InboxUnreadCount(r), json => BridgeJson.ParseUnreadCount(Require(json)));
 
+    public Task<string?> ChatCallAsync(string method, string argsJson) =>
+        Call(r => _bridge.ChatCall(method, argsJson, r), json => json);
+
     public void SendEvent(string name, Dictionary<string, object?> properties, double? value) =>
         _bridge.SendEvent(name, EventProperties.ToJson(properties), value ?? 0d, value.HasValue);
 

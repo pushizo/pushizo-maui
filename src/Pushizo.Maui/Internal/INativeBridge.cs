@@ -144,6 +144,14 @@ internal interface INativeBridge
     /// </summary>
     void RequestLocationPermission(string? rationale, Action<bool> completion);
 
+    /// <summary>
+    /// Canlı sohbet çağrısı (ADR-0040). <paramref name="method"/>: start, getConfig, getConversation, getMessages,
+    /// sendMessage, sendAttachment (base64), markRead, refreshUnreadCount, getUnreadCount, leaveOfflineMessage, setTyping,
+    /// startListening, stopListening, attachmentUrl, getVisitorId. Başarı JSON'u yerel modelin camelCase sözlüğü
+    /// (sayaçlar <c>{"unreadCount"}</c>, adres <c>{"url"}</c>, kimlik <c>{"visitorId"}</c>; dönüşsüz işlemlerde null).
+    /// </summary>
+    void ChatCall(string method, string argsJson, NativeResult result);
+
     /// <summary>Ön plan olayının (<c>foreground</c> olayındaki <c>eventId</c>) yerel gösterimini engeller.</summary>
     void ForegroundPreventDefault(string eventId);
 

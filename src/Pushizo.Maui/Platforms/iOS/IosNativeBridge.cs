@@ -82,6 +82,9 @@ internal sealed class IosNativeBridge : INativeBridge
 
     public void SetInAppPaused(bool paused) => HSMauiBridge.UpdateInAppPaused(paused);
 
+    public void ChatCall(string method, string argsJson, NativeResult result) =>
+        HSMauiBridge.ChatCall(method, argsJson, (json, code, message) => result(json, code, message));
+
     public void InboxList(int limit, string? cursor, NativeResult result) =>
         HSMauiBridge.InboxList(limit, cursor, (json, code, message) => result(json, code, message));
 

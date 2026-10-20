@@ -29,6 +29,19 @@ internal sealed class FakeNativeBridge : INativeBridge
     /// <summary>Bildirim kutusu yanıtı: (json, hata kodu, hata mesajı).</summary>
     public (string? Json, string? Code, string? Message) InboxResponse { get; set; } = ("{}", null, null);
 
+    /// <summary>Sohbet yanıtları (yöntem → json, hata kodu, hata mesajı); tanımsız yöntem null JSON döner.</summary>
+    public Dictionary<string, (string? Json, string? Code, string? Message)> ChatResponses { get; } = new();
+
+    /// <summary>Sohbet çağrıları: (yöntem, argüman JSON'u).</summary>
+    public List<(string Method, string ArgsJson)> ChatCalls { get; } = new();
+
+    public void ChatCall(string method, string argsJson, NativeResult result)
+    {
+        ChatCalls.Add((method, argsJson));
+        var (json, code, message) = ChatResponses.TryGetValue(method, out var r) ? r : (null, null, null);
+        result(json, code, message);
+    }
+
     /// <summary>Tercih yanıtı: (json, hata kodu, hata mesajı).</summary>
     public (string? Json, string? Code, string? Message) PreferencesResponse { get; set; } = ("""{"preferences":[],"categories":[]}""", null, null);
 

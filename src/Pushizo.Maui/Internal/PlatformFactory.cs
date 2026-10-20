@@ -98,6 +98,7 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
         set => Ignored(nameof(InAppPaused));
     }
 
+    public Task<string?> ChatCallAsync(string method, string argsJson) => NotSupported<string?>("Canlı sohbet");
     public Task<InboxPage> InboxListAsync(int limit, string? cursor) => NotSupported<InboxPage>();
     public Task<InboxItem> InboxMarkReadAsync(string id) => NotSupported<InboxItem>();
     public Task<int> InboxMarkAllReadAsync() => NotSupported<int>();
