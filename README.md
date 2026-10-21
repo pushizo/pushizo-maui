@@ -1,9 +1,37 @@
+<!-- pushizo:header -->
+<p align="center">
+  <a href="https://pushizo.com"><img src="https://raw.githubusercontent.com/pushizo/.github/main/profile/assets/mark.svg" alt="Pushizo" width="56" height="56"></a>
+</p>
+<p align="center">
+  <a href="https://docs.pushizo.com/docs/sdk/maui"><img src="https://img.shields.io/badge/docs-docs.pushizo.com-5b4bdb" alt="Docs"></a>
+  <a href="https://docs.pushizo.com/docs/api"><img src="https://img.shields.io/badge/API-reference-b44fc4" alt="API reference"></a>
+  <a href="https://github.com/pushizo/pushizo-maui/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-16130f" alt="License: MIT"></a>
+</p>
+<p align="center"><a href="#english">English</a> · <a href="#türkçe">Türkçe</a></p>
+
+## English
+
+**Pushizo .NET MAUI SDK** — .NET MAUI SDK that wraps the native Pushizo Android and iOS SDKs. The API surface matches eski sağlayıcı v5 and the Pushizo Flutter plugin.
+
+> **Status:** Publishing to NuGet is in progress; until then you can build from this repository.<br>
+> **Durum:** NuGet yayını hazırlanıyor; o zamana kadar bu depodan derleyerek kullanabilirsiniz.
+
+```bash
+dotnet add package Pushizo.Maui
+```
+
+The detailed guide below is in Turkish; code samples are language-neutral. Full documentation:
+[docs.pushizo.com/docs/sdk/maui](https://docs.pushizo.com/docs/sdk/maui) · API reference: [docs.pushizo.com/docs/api](https://docs.pushizo.com/docs/api).
+
+## Türkçe
+<!-- /pushizo:header -->
+
 # Pushizo .NET MAUI SDK (`Pushizo.Maui`)
 
 Push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, bildirim tercihleri, konum paylaşımı ve e-posta/SMS abonelikleri için .NET MAUI
 SDK'sı. Yerel Pushizo Android (`com.pushizo:pushizo-android`) ve iOS (`Pushizo` Swift) SDK'larını sarar;
 tetik değerlendirme, çevrimdışı kuyruk, teslimat geri bildirimi ve in-app çizimi yerel SDK'dadır. API yüzeyi
-plan 06 §6.1 (eski sağlayıcı v5 ile uyumlu) ve Flutter eklentisiyle aynıdır.
+eski sağlayıcı v5 ile uyumlu ve Flutter eklentisiyle aynıdır.
 
 | Hedef | Davranış |
 |-------|----------|
@@ -58,7 +86,7 @@ builder.UseMauiApp<App>()
   ```
 - Zengin medya, rozet ve teslimat onayı için Xcode'da bir Notification Service Extension hedefi ekleyip yerel
   `PushizoExtension` (SPM) ya da `Pushizo/Extension` (CocoaPods) ile `PushizoNotificationServiceExtension`
-  sınıfını kullanın (bkz. `docs/sdk/ios.md`).
+  sınıfını kullanın (bkz. [ios rehberi](https://docs.pushizo.com/docs/sdk/ios)).
 
 ## Kullanım
 
@@ -71,7 +99,7 @@ Pushizo.User.SetLanguage("tr");
 Pushizo.User.AddEmail("ali@example.com");
 Pushizo.User.AddSms("+905321234567");
 
-// Bildirim tercihleri (ADR-0019 §4): kategori × kanal (Channel null = tüm kanallar)
+// Bildirim tercihleri: kategori × kanal (Channel null = tüm kanallar)
 var prefs = await Pushizo.User.GetPreferencesAsync();
 foreach (var category in prefs.Categories) Console.WriteLine(category.LocalizedName("tr"));
 await Pushizo.User.SetPreferencesAsync(new[]
@@ -115,7 +143,7 @@ girdiyi köprüden önce doğrular (1-100 kayıt, kategori 1-64 karakter, kanal 
 ### JWT ile kimlik doğrulama
 
 App ayarlarında kimlik doğrulama kipi (`identity_verification_mode`) `jwt` veya `both` ise kullanıcı, sunucunuzda
-imzalanmış kısa ömürlü bir ES256 JWT ile kimliklendirilir (ADR-0023 §9; talepler: `sub` = external_id, `aud` = app_id, `exp`/`iat` zorunlu, en çok 24 saat, yalnızca ES256).
+imzalanmış kısa ömürlü bir ES256 JWT ile kimliklendirilir (talepler: `sub` = external_id, `aud` = app_id, `exp`/`iat` zorunlu, en çok 24 saat, yalnızca ES256).
 
 ```csharp
 Pushizo.Login("user_42", jwt: jwtFromYourServer);                         // yalnızca JWT
@@ -134,7 +162,7 @@ Pushizo.Logout();
 
 ### Live Activities (iOS)
 
-Köprü, iOS SDK'nın genel türü `PushizoDefaultLiveActivityAttributes`'ı kullanır (ADR-0024). Dashboard/API'de Live
+Köprü, iOS SDK'nın genel türü `PushizoDefaultLiveActivityAttributes`'ı kullanır. Dashboard/API'de Live
 Activity türü adı tam olarak `PushizoDefaultLiveActivityAttributes` olmalıdır.
 
 ```csharp
@@ -183,7 +211,7 @@ await Pushizo.LiveActivities.StartDefaultLiveActivityAsync(
   `NOT_READY` (yerel SDK başlatılmadı), `INVALID_ARGUMENT`, `LIVE_ACTIVITY_FAILED` (Live Activities kapalı,
   `NSSupportsLiveActivities` eksik vb.).
 - Tip-güvenli kendi `ActivityAttributes` türünüz için native tarafta `Pushizo.LiveActivities.register(MyAttributes.self)`
-  çağırın (ayrıntı: `docs/sdk/ios.md` "Live Activities").
+  çağırın (ayrıntı: [ios rehberi](https://docs.pushizo.com/docs/sdk/ios) "Live Activities").
 
 ### HTML in-app ve carousel
 
@@ -191,7 +219,7 @@ In-app mesajları yerel Android/iOS SDK'sı çizer; bu paket köprüdür. HTML i
 `close`/`click`/`addTag`/`trackEvent`) ve carousel blokları yerel SDK'dan olduğu gibi devralınır: ek kod veya
 yapılandırma gerekmez, tıklama ve yaşam döngüsü olayları mevcut in-app dinleyicilerine gelir. Yetenek bildirimi
 (`supports=html,carousel`) yerel SDK tarafından yapılır; desteklemeyen eski yerel sürümlere sunucu HTML mesaj göndermez
-ve carousel bloklarını çıkarır (ADR-0027 §6–7).
+ve carousel bloklarını çıkarır.
 
 ### Canlı sohbet
 
@@ -210,7 +238,7 @@ Ziyaretçi kimliği, çevrimdışı kuyruk (aynı `client_message_id` ile yenide
 geri çekilme + `after_seq` yoklaması) ve push ile gelen temsilci mesajları (`pushizo_chat`) yerel Android/iOS SDK'sındadır;
 `start` sonrası login/logout ve push aboneliği değişince bağlama yerel SDK'da yenilenir, logout ziyaretçiyi sıfırlar.
 Mesajlar `seq` ile sıralanır; ağ yokken gönderilen mesaj `pending` döner ve gönderilince olayla sunucu kopyası gelir.
-Ayrıntı: `docs/sdk/android.md` / `docs/sdk/ios.md` → "Canlı sohbet" (ADR-0040).
+Ayrıntı: [android rehberi](https://docs.pushizo.com/docs/sdk/android) / [ios rehberi](https://docs.pushizo.com/docs/sdk/ios) → "Canlı sohbet".
 Android ve iOS dışındaki hedeflerde çağrılar `PushizoException` (`PLATFORM_NOT_SUPPORTED`) ile sonuçlanır.
 
 ### Konum
@@ -282,4 +310,25 @@ dotnet build sdk/maui/src/Pushizo.Maui -f net9.0-ios
 
 Android AAR'ları `src/Pushizo.Maui.Android.Binding/build/native`, iOS xcframework'ü
 `src/Pushizo.Maui.iOS.Binding/build/native` altına üretilir; `sdk/android` ve `sdk/ios` altına çıktı yazılmaz.
-Örnek uygulama: `examples/maui-app`.
+Adım adım kurulum ve örnek kod: [maui rehberi](https://docs.pushizo.com/docs/sdk/maui).
+
+<!-- pushizo:footer -->
+---
+
+## Support · Destek
+
+- **Guide · Rehber:** [docs.pushizo.com/docs/sdk/maui](https://docs.pushizo.com/docs/sdk/maui)
+- **API reference & OpenAPI · API referansı ve OpenAPI:** [docs.pushizo.com/docs/api](https://docs.pushizo.com/docs/api) ·
+  [pushizo-openapi](https://github.com/pushizo/pushizo-openapi)
+- **Bugs & ideas · Hata ve öneri:** [Issues](https://github.com/pushizo/pushizo-maui/issues)
+- **Security · Güvenlik:** please do not open public issues; email [security@pushizo.com](mailto:security@pushizo.com) ·
+  herkese açık issue açmayın, bu adrese yazın.
+- **Help · Destek:** [support@pushizo.com](mailto:support@pushizo.com)
+
+This repository is mirrored automatically from the Pushizo main repository on every release. Please open an issue
+instead of a pull request; fixes land in the main repository and ship with the next release.
+Bu depo her sürümde Pushizo ana deposundan otomatik yansıtılır. Pull request yerine issue açın; düzeltmeler ana depoda
+yapılır ve bir sonraki sürümle buraya gelir.
+
+Released under the MIT License · MIT lisanslıdır — [LICENSE](https://github.com/pushizo/pushizo-maui/blob/main/LICENSE).
+<!-- /pushizo:footer -->

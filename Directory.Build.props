@@ -15,7 +15,7 @@
     <Company>Pushizo</Company>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://docs.pushizo.com/docs/sdk/maui</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/exec0de/pushizo</RepositoryUrl>
+    <RepositoryUrl>https://github.com/pushizo/pushizo-maui</RepositoryUrl>
     <PackageTags>pushizo;push;notifications;in-app;inbox;maui;android;ios</PackageTags>
     <!-- iOS hedefi yalnızca macOS'ta (Xcode + maui-ios iş yükü) ya da açıkça istendiğinde derlenir. -->
     <PushizoIncludeIos Condition="'$(PushizoIncludeIos)' == '' and $([MSBuild]::IsOSPlatform('osx'))">true</PushizoIncludeIos>
