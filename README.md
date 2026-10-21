@@ -13,8 +13,18 @@
 
 **Pushizo .NET MAUI SDK** — .NET MAUI SDK that wraps the native Pushizo Android and iOS SDKs. The API surface matches eski sağlayıcı v5 and the Pushizo Flutter plugin.
 
-> **Status:** Publishing to NuGet is in progress; until then you can build from this repository.<br>
-> **Durum:** NuGet yayını hazırlanıyor; o zamana kadar bu depodan derleyerek kullanabilirsiniz.
+> **Status:** Publishing to NuGet is in progress.<br>
+> **Durum:** NuGet yayını hazırlanıyor.
+
+**Install from GitHub until then · O zamana kadar GitHub'dan kurulum:**
+
+```bash
+git clone --branch v0.1.0 https://github.com/pushizo/pushizo-maui
+dotnet pack pushizo-maui -c Release -o ./packages   # macOS + MAUI iş yükü / workload
+dotnet add package Pushizo.Maui --source ./packages
+```
+
+**After publication · Yayından sonra:**
 
 ```bash
 dotnet add package Pushizo.Maui
