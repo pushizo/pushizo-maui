@@ -1,0 +1,70 @@
+# NuGet yayını: Pushizo.Maui + Android/iOS binding (macOS)
+#
+# Trusted publishing (OIDC): uzun ömürlü belirteç saklanmaz. Ana depodaki yayın betiği paketi test edip derler, bu
+# deponun GitHub Release'ine ekler ve bu iş akışını sürüm etiketiyle çalıştırır:
+#   npm run sdk:publish -- <hedef> --yalnizca-github --tetikle --yayinla
+# Elle: Actions → Release → Run workflow → tag.
+# Kurulum (bir kez): nuget.org Trusted publishing policy: depo pushizo-maui, iş akışı release.yml; depo değişkeni NUGET_USER. Yerel SDK'lar pushizo-android ve pushizo-ios depolarının aynı sürüm etiketinden alınır.
+
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Sürüm etiketi (ör. v0.1.0)
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  nuget:
+    runs-on: macos-15
+    steps:
+      - name: Kaynaklar (ana depodaki sdk/ yerleşimi)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.tag }}
+          path: sdk/maui
+      - uses: actions/checkout@v7
+        with:
+          repository: pushizo/pushizo-android
+          ref: ${{ inputs.tag }}
+          path: sdk/android
+      - name: iOS SDK etiketi (v öneksiz)
+        id: ios
+        run: echo "tag=${TAG#v}" >> "$GITHUB_OUTPUT"
+        env:
+          TAG: ${{ inputs.tag }}
+      - uses: actions/checkout@v7
+        with:
+          repository: pushizo/pushizo-ios
+          ref: ${{ steps.ios.outputs.tag }}
+          path: sdk/ios
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.14'
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 9.0.x
+      - name: İş yükleri
+        working-directory: sdk/maui
+        run: dotnet workload install android ios
+      - name: Testler
+        working-directory: sdk/maui
+        run: dotnet test tests/Pushizo.Maui.Tests -p:PushizoIncludeAndroid=false -p:PushizoIncludeIos=false --nologo
+      - name: Paketler
+        working-directory: sdk/maui
+        run: dotnet pack Pushizo.Maui.sln -c Release --nologo -o "$RUNNER_TEMP/nupkg"
+      - uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
+      - name: Yayımla
+        run: dotnet nuget push "$RUNNER_TEMP/nupkg/*.nupkg" --api-key "${{ steps.login.outputs.NUGET_API_KEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
