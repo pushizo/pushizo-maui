@@ -37,7 +37,7 @@ public sealed class InAppAndInboxTests : PushizoTestBase
     {
         Bridge.InboxResponse = ("""
             {"items":[
-              {"id":"in_1","messageId":"msg_1","title":"Hoş geldin","body":"Merhaba","url":null,"imageUrl":"https://cdn.example.com/a.png",
+              {"id":"in_1","messageId":"msg_1","title":"Hoş geldin","body":"Merhaba","url":null,"imageUrl":"https://cdn.pushizo.com/a.png",
                "data":{"k":"v"},"read":false,"readAt":null,"archivedAt":null,"expiresAt":1767225600000,"createdAt":1759838400000},
               {"id":"in_2","read":true,"readAt":1759842000000}
             ],"unreadCount":1,"nextCursor":"c_2","hasMore":true}

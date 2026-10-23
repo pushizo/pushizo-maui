@@ -26,8 +26,8 @@ public sealed class InitializationTests : PushizoTestBase
 
     [Theory]
     [InlineData("")]
-    [InlineData("api.example.com")]
-    [InlineData("ftp://api.example.com")]
+    [InlineData("api.pushizo.com")]
+    [InlineData("ftp://api.pushizo.com")]
     public void Initialize_requires_http_api_url(string apiUrl) =>
         Assert.Throws<ArgumentException>(() => Pushizo.Initialize("app_test", new PushizoOptions { ApiUrl = apiUrl }));
 
@@ -41,7 +41,7 @@ public sealed class InitializationTests : PushizoTestBase
             LogLevel = LogLevel.Debug,
             AndroidDefaultChannelName = "Kampanyalar",
             AndroidDefaultChannelId = "promo",
-            IosAppGroup = "group.com.example.app",
+            IosAppGroup = "group.com.pushizo.app",
             IosProvisionalAuthorization = true,
         });
 
@@ -53,7 +53,7 @@ public sealed class InitializationTests : PushizoTestBase
         Assert.Equal(4, o.GetProperty("logLevel").GetInt32());
         Assert.Equal("Kampanyalar", o.GetProperty("androidDefaultChannelName").GetString());
         Assert.Equal("promo", o.GetProperty("androidDefaultChannelId").GetString());
-        Assert.Equal("group.com.example.app", o.GetProperty("iosAppGroup").GetString());
+        Assert.Equal("group.com.pushizo.app", o.GetProperty("iosAppGroup").GetString());
         Assert.Equal(JsonValueKind.Null, o.GetProperty("iosApnsEnvironment").ValueKind);
         Assert.True(o.GetProperty("iosProvisionalAuthorization").GetBoolean());
         Assert.Equal(LogLevel.Debug, Pushizo.Debug.LogLevel);
@@ -73,17 +73,17 @@ public sealed class InitializationTests : PushizoTestBase
     [Fact]
     public void Options_are_copied_at_initialize()
     {
-        var options = new PushizoOptions { ApiUrl = "https://api.example.com" };
+        var options = new PushizoOptions { ApiUrl = "https://api.pushizo.com" };
         Pushizo.Initialize("app_test", options);
-        options.ApiUrl = "https://changed.example.com";
-        Assert.Contains("https://api.example.com", Bridge.OptionsJson);
+        options.ApiUrl = "https://changed.pushizo.com";
+        Assert.Contains("https://api.pushizo.com", Bridge.OptionsJson);
     }
 
     [Fact]
     public void Explicit_log_level_before_initialize_wins_over_options()
     {
         Pushizo.Debug.SetLogLevel(LogLevel.Info);
-        InitializeSdk(new PushizoOptions { ApiUrl = "https://api.example.com", LogLevel = LogLevel.Error });
+        InitializeSdk(new PushizoOptions { ApiUrl = "https://api.pushizo.com", LogLevel = LogLevel.Error });
         using var doc = JsonDocument.Parse(Bridge.OptionsJson!);
         Assert.Equal(3, doc.RootElement.GetProperty("logLevel").GetInt32());
 
@@ -135,7 +135,7 @@ public sealed class InitializationTests : PushizoTestBase
     public void Unsupported_platform_is_a_safe_no_op()
     {
         Pushizo.ResetForTests(new UnsupportedPlatform());
-        Pushizo.Initialize("app_test", new PushizoOptions { ApiUrl = "https://api.example.com" });
+        Pushizo.Initialize("app_test", new PushizoOptions { ApiUrl = "https://api.pushizo.com" });
 
         Assert.False(Pushizo.IsSupported);
         Pushizo.Login("user_1");
@@ -151,7 +151,7 @@ public sealed class InitializationTests : PushizoTestBase
     public async Task Unsupported_platform_inbox_reports_platform_not_supported()
     {
         Pushizo.ResetForTests(new UnsupportedPlatform());
-        Pushizo.Initialize("app_test", new PushizoOptions { ApiUrl = "https://api.example.com" });
+        Pushizo.Initialize("app_test", new PushizoOptions { ApiUrl = "https://api.pushizo.com" });
 
         var error = await Assert.ThrowsAsync<PushizoException>(() => Pushizo.Inbox.ListAsync());
         Assert.Equal(PushizoException.PlatformNotSupported, error.Code);

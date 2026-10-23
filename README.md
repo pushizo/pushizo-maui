@@ -13,8 +13,8 @@
 
 **Pushizo .NET MAUI SDK** — .NET MAUI SDK that wraps the native Pushizo Android and iOS SDKs. The API surface matches eski sağlayıcı v5 and the Pushizo Flutter plugin.
 
-> **Status:** Publishing to NuGet is in progress.<br>
-> **Durum:** NuGet yayını hazırlanıyor.
+> **Status:** Pushizo 0.1.0 is on NuGet. Pushizo.Maui still needs a macOS build.<br>
+> **Durum:** Pushizo 0.1.0 NuGet'te. Pushizo.Maui için macOS derlemesi gerekiyor.
 
 **Install from GitHub until then · O zamana kadar GitHub'dan kurulum:**
 
@@ -63,7 +63,7 @@ var builder = MauiApp.CreateBuilder();
 builder.UseMauiApp<App>()
        .UsePushizo("app_…", o =>
        {
-           o.ApiUrl = "https://api.example.com";
+           o.ApiUrl = "https://api.pushizo.com";
            o.RequiresPrivacyConsent = false; // KVKK/GDPR: true ise SetConsentGiven(true) gelene kadar ağ çağrısı yok
        });
 ```
@@ -106,7 +106,7 @@ Pushizo.Login("user_42", identityHash: hashFromYourServer);   // identity verifi
 Pushizo.User.AddTags(new Dictionary<string, string> { ["plan"] = "pro" });
 Pushizo.User.AddAlias("crm_id", "42");
 Pushizo.User.SetLanguage("tr");
-Pushizo.User.AddEmail("ali@example.com");
+Pushizo.User.AddEmail("ali@pushizo.com");
 Pushizo.User.AddSms("+905321234567");
 
 // Bildirim tercihleri: kategori × kanal (Channel null = tüm kanallar)

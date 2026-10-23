@@ -8,7 +8,7 @@ namespace PushizoSdk.Maui;
 /// <code>
 /// var builder = MauiApp.CreateBuilder();
 /// builder.UseMauiApp&lt;App&gt;()
-///        .UsePushizo("app_…", o =&gt; o.ApiUrl = "https://api.example.com");
+///        .UsePushizo("app_…", o =&gt; o.ApiUrl = "https://api.pushizo.com");
 /// </code>
 /// SDK'yı başlatır ve gereken yaşam döngüsü olaylarını bağlar (Android: bildirim izni sonucu). iOS'ta APNs token'ı
 /// <c>AppDelegate</c> içinden <c>PushizoIos.RegisteredForRemoteNotifications</c> ile iletilir.
