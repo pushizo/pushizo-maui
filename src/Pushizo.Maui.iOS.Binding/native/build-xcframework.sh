@@ -13,6 +13,8 @@ XCFRAMEWORK="$OUT/$SCHEME.xcframework"
 mkdir -p "$OUT"
 rm -rf "$XCFRAMEWORK" "$OUT/ios.xcarchive" "$OUT/ios-simulator.xcarchive"
 
+# Yerel SDK'nın modül adı (Pushizo) içindeki Pushizo tipiyle çakıştığından, dağıtım kipinde üretilen swiftinterface
+# dosyasının doğrulaması başarısız olur. Bu arayüz xcframework'e girmediğinden yalnızca doğrulama kapatılır.
 archive() {
   local destination="$1" name="$2"
   (cd "$HERE" && xcodebuild archive \
@@ -22,7 +24,8 @@ archive() {
     -derivedDataPath "$DERIVED" \
     -quiet \
     SKIP_INSTALL=NO \
-    BUILD_LIBRARY_FOR_DISTRIBUTION=YES)
+    BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
+    'OTHER_SWIFT_FLAGS=$(inherited) -no-verify-emitted-module-interface')
 }
 
 # Arşivdeki framework yolu Xcode sürümüne göre değişebildiğinden aranarak bulunur.

@@ -24,8 +24,11 @@
       makinelerde (ör. yalnızca paylaşılan katmanın birim testleri) -p:PushizoIncludeAndroid=false verilir.
     -->
     <PushizoIncludeAndroid Condition="'$(PushizoIncludeAndroid)' == ''">true</PushizoIncludeAndroid>
-    <!-- net9.0 hedefleri yalnızca .NET 9+ SDK ile eklenir (.NET 8 SDK'sı net9.0 hedefini geri yükleyemez). -->
-    <PushizoNet9 Condition="'$(NETCoreSdkVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '9.0'))">true</PushizoNet9>
+    <!--
+      net9.0 hedefleri yalnızca .NET 9+ SDK ile eklenir (.NET 8 SDK'sı net9.0 hedefini geri yükleyemez). NETCoreSdkVersion
+      bu dosya okunduktan sonra tanımlandığından SDK sürümü, erken tanımlı MSBuildVersion'dan çıkarılır (.NET 9 SDK → 17.12+).
+    -->
+    <PushizoNet9 Condition="'$(PushizoNet9)' == '' and $([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '17.12'))">true</PushizoNet9>
     <PushizoAndroidTargets>net8.0-android</PushizoAndroidTargets>
     <PushizoAndroidTargets Condition="'$(PushizoNet9)' == 'true'">net8.0-android;net9.0-android</PushizoAndroidTargets>
     <PushizoIosTargets>net8.0-ios</PushizoIosTargets>
