@@ -229,6 +229,43 @@ namespace PushizoSdk.Native.iOS
         void RequestLocationPermission ([NullAllowed] string rationale, HSMauiPermissionHandler completion);
 
         [Static]
+        [Export ("geofencingEnabled")]
+        bool GeofencingEnabled ();
+
+        [Static]
+        [Export ("updateGeofencingEnabled:")]
+        void UpdateGeofencingEnabled (bool enabled);
+
+        [Static]
+        [Export ("featureFlagsRefreshWithCompletion:")]
+        void FeatureFlagsRefresh (HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("featureFlagEnabled:fallback:")]
+        bool FeatureFlagEnabled (string key, bool fallback);
+
+        [Static]
+        [Export ("featureFlagValue:")]
+        [return: NullAllowed]
+        string FeatureFlagValue (string key);
+
+        [Static]
+        [Export ("placementsList:limit:completion:")]
+        void PlacementsList (string key, nint limit, HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("placementsReportImpression:")]
+        void PlacementsReportImpression (string messageId);
+
+        [Static]
+        [Export ("placementsReportClick:buttonId:")]
+        void PlacementsReportClick (string messageId, string buttonId);
+
+        [Static]
+        [Export ("placementsReportDismiss:")]
+        void PlacementsReportDismiss (string messageId);
+
+        [Static]
         [Export ("foregroundPreventDefault:")]
         void ForegroundPreventDefault (string eventId);
 

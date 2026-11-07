@@ -12,6 +12,8 @@ namespace PushizoSdk.Maui;
 /// Pushizo.User.AddTag("plan", "pro");
 /// Pushizo.InAppMessages.AddTrigger("level", "gold");
 /// var page = await Pushizo.Inbox.ListAsync(limit: 20);
+/// if (Pushizo.FeatureFlags.IsEnabled("yeni_sepet")) ShowNewCart();
+/// var banners = await Pushizo.Placements.ListAsync("ana_sayfa_ust");
 /// await Pushizo.Chat.StartAsync();
 /// Pushizo.Chat.EventReceived += (_, e) => { if (e.Type == ChatEventType.Message) Show(e.Message!); };
 /// </code>
@@ -19,7 +21,7 @@ namespace PushizoSdk.Maui;
 public static class Pushizo
 {
     /// <summary>Bu C# katmanının sürümü.</summary>
-    public const string SdkVersion = "0.1.0";
+    public const string SdkVersion = "0.2.0";
 
     private static readonly object s_gate = new();
     private static IPushizoPlatform s_platform = PlatformFactory.Create();
@@ -43,6 +45,10 @@ public static class Pushizo
     public static SessionManager Session { get; } = new();
     public static LiveActivitiesManager LiveActivities { get; } = new();
     public static LocationManager Location { get; } = new();
+    /// <summary>Özellik bayrakları (ADR-0066).</summary>
+    public static FeatureFlagsManager FeatureFlags { get; } = new();
+    /// <summary>Gömülü yerleşimler (ADR-0068).</summary>
+    public static PlacementsManager Placements { get; } = new();
     public static DebugManager Debug { get; } = new();
 
     /// <summary>

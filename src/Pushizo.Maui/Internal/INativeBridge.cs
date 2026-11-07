@@ -144,6 +144,36 @@ internal interface INativeBridge
     /// </summary>
     void RequestLocationPermission(string? rationale, Action<bool> completion);
 
+    /// <summary>Arka plan bölge izleme açık mı (yerel SDK'daki kalıcı tercih; ADR-0065, varsayılan kapalı).</summary>
+    bool GetGeofencingEnabled();
+
+    /// <summary>Arka plan bölge izlemeyi açar/kapatır; köprü izin istemez (izinler uygulamanındır).</summary>
+    void SetGeofencingEnabled(bool enabled);
+
+    /// <summary>Özellik bayraklarını hemen yeniler (ADR-0066). Başarı JSON'u: <c>{"refreshed":bool}</c>.</summary>
+    void FeatureFlagsRefresh(NativeResult result);
+
+    /// <summary>Bayrak açık mı; değer henüz yoksa <paramref name="fallback"/>.</summary>
+    bool FeatureFlagEnabled(string key, bool fallback);
+
+    /// <summary><c>{"value":…}</c> (metin, sayı, mantıksal, nesne veya dizi); değer yoksa null.</summary>
+    string? FeatureFlagValue(string key);
+
+    /// <summary>
+    /// Gömülü yerleşim içeriği (ADR-0068). Başarı JSON'u: <c>{"messages":[{"messageId","json"}]}</c>; köprü dönen
+    /// mesajları rapor çağrıları için kimliğe göre sınırlı bir önbellekte tutar.
+    /// </summary>
+    void PlacementsList(string key, int limit, NativeResult result);
+
+    /// <summary>Gösterim bildirimi; mesaj köprü önbelleğinde yoksa yok sayılır.</summary>
+    void PlacementsReportImpression(string messageId);
+
+    /// <summary>Tıklama bildirimi; mesaj köprü önbelleğinde yoksa yok sayılır.</summary>
+    void PlacementsReportClick(string messageId, string buttonId);
+
+    /// <summary>Kapatma bildirimi; mesaj köprü önbelleğinde yoksa yok sayılır.</summary>
+    void PlacementsReportDismiss(string messageId);
+
     /// <summary>
     /// Canlı sohbet çağrısı (ADR-0040). <paramref name="method"/>: start, getConfig, getConversation, getMessages,
     /// sendMessage, sendAttachment (base64), markRead, refreshUnreadCount, getUnreadCount, leaveOfflineMessage, setTyping,

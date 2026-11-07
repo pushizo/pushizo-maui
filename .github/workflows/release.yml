@@ -4,7 +4,7 @@
 # deponun GitHub Release'ine ekler ve bu iş akışını sürüm etiketiyle çalıştırır:
 #   npm run sdk:publish -- <hedef> --yalnizca-github --tetikle --yayinla
 # Elle: Actions → Release → Run workflow → tag.
-# Kurulum (bir kez): nuget.org Trusted publishing policy: depo pushizo-maui, iş akışı release.yml; depo değişkeni NUGET_USER. Yerel SDK'lar pushizo-android ve pushizo-ios depolarının aynı sürüm etiketinden alınır.
+# Kurulum (bir kez): nuget.org Trusted publishing policy: depo pushizo-maui, iş akışı release.yml; depo değişkeni NUGET_USER. Yerel SDK'lar pushizo-android ve pushizo-ios depolarından Directory.Build.props'taki sürümlerle (PushizoNativeAndroidVersion / PushizoNativeIosVersion) alınır.
 
 name: Release
 
@@ -28,20 +28,24 @@ jobs:
         with:
           ref: ${{ inputs.tag }}
           path: sdk/maui
+      - name: Yerel SDK sürümleri (Directory.Build.props)
+        id: native
+        working-directory: sdk/maui
+        run: |
+          android="$(sed -n 's:.*<PushizoNativeAndroidVersion>\(.*\)</PushizoNativeAndroidVersion>.*:\1:p' Directory.Build.props)"
+          ios="$(sed -n 's:.*<PushizoNativeIosVersion>\(.*\)</PushizoNativeIosVersion>.*:\1:p' Directory.Build.props)"
+          test -n "$android" && test -n "$ios"
+          echo "android=v$android" >> "$GITHUB_OUTPUT"
+          echo "ios=$ios" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v7
         with:
           repository: pushizo/pushizo-android
-          ref: ${{ inputs.tag }}
+          ref: ${{ steps.native.outputs.android }}
           path: sdk/android
-      - name: iOS SDK etiketi (v öneksiz)
-        id: ios
-        run: echo "tag=${TAG#v}" >> "$GITHUB_OUTPUT"
-        env:
-          TAG: ${{ inputs.tag }}
       - uses: actions/checkout@v7
         with:
           repository: pushizo/pushizo-ios
-          ref: ${{ steps.ios.outputs.tag }}
+          ref: ${{ steps.native.outputs.ios }}
           path: sdk/ios
       - uses: actions/setup-java@v6
         with:

@@ -60,6 +60,38 @@ public sealed partial class NativeBridgeSourceContractTests
         Assert.Contains("locationShared", exported);
         Assert.Contains("updateLocationShared:", exported);
         Assert.Contains("requestLocationPermissionWithRationale:completion:", exported);
+        Assert.Contains("geofencingEnabled", exported);
+        Assert.Contains("updateGeofencingEnabled:", exported);
+        Assert.Contains("featureFlagsRefreshWithCompletion:", exported);
+        Assert.Contains("featureFlagEnabled:fallback:", exported);
+        Assert.Contains("featureFlagValue:", exported);
+        Assert.Contains("placementsList:limit:completion:", exported);
+        Assert.Contains("placementsReportClick:buttonId:", exported);
+    }
+
+    [Fact]
+    public void Package_version_matches_sdk_version_constant()
+    {
+        var props = Read("Directory.Build.props");
+        var match = Regex.Match(props, "<PushizoVersion>([^<]+)</PushizoVersion>");
+
+        Assert.True(match.Success);
+        Assert.Equal(Pushizo.SdkVersion, match.Groups[1].Value);
+    }
+
+    [Fact]
+    public void Native_bridges_cache_placement_messages_for_reports()
+    {
+        // Rapor çağrıları yerel tarafta mesaj nesnesi ister; köprüler son liste yanıtlarını kimliğe göre saklar (en çok 50).
+        Assert.Contains("MAX_PLACEMENT_MESSAGES = 50", Kotlin);
+        Assert.Contains("Pushizo.Placements.list(key, limit)", Kotlin);
+        Assert.Contains("maxPlacementMessages = 50", Swift);
+        Assert.Contains("Pushizo.Placements.list(key, limit: limit)", Swift);
+        // Bölge izleme: köprüler izin istemez, yalnızca yerel tercihi yazar/okur.
+        Assert.Contains("Pushizo.Location.setGeofencingEnabled(enabled)", Kotlin);
+        Assert.Contains("Pushizo.Location.setGeofencingEnabled(enabled)", Swift);
+        Assert.DoesNotContain("ACCESS_BACKGROUND_LOCATION\"", Kotlin);
+        Assert.DoesNotContain("requestAlwaysPermission", Swift);
     }
 
     [Fact]
@@ -82,6 +114,9 @@ public sealed partial class NativeBridgeSourceContractTests
             .ToHashSet();
 
         Assert.Contains("requestLocationPermission", called);
+        Assert.Contains("placementsList", called);
+        Assert.Contains("featureFlagsRefresh", called);
+        Assert.Contains("updateGeofencingEnabled", called);
         Assert.Empty(called.Except(kotlin));
     }
 

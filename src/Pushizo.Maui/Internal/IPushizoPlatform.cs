@@ -77,6 +77,23 @@ internal interface IPushizoPlatform
 
     /// <summary><paramref name="rationale"/> boş değilse kırpılmıştır; null ise yerel SDK'nın varsayılan metni kullanılır.</summary>
     Task<bool> RequestLocationPermissionAsync(string? rationale);
+
+    // Arka plan bölge izleme (ADR-0065; varsayılan kapalı, izinler uygulamanındır)
+    bool GeofencingEnabled { get; }
+    void SetGeofencingEnabled(bool enabled);
+
+    // Özellik bayrakları (ADR-0066; değerler yerel SDK'da saklanır)
+    Task<bool> RefreshFeatureFlagsAsync();
+    bool IsFeatureFlagEnabled(string key, bool defaultValue);
+
+    /// <summary>Değer yoksa null (varsayılan çağıran katmanda uygulanır).</summary>
+    object? GetFeatureFlagValue(string key);
+
+    // Gömülü yerleşimler (ADR-0068; anahtar ve limit doğrulanmıştır)
+    Task<IReadOnlyList<InAppMessage>> PlacementsListAsync(string key, int limit);
+    void PlacementsReportImpression(string messageId);
+    void PlacementsReportClick(string messageId, string buttonId);
+    void PlacementsReportDismiss(string messageId);
 }
 
 /// <summary>Yerel SDK olaylarının ortak katmana iletimi (herhangi bir iş parçacığından çağrılabilir).</summary>

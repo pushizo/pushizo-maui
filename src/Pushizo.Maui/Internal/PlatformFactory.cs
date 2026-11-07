@@ -19,6 +19,7 @@ internal static class PlatformFactory
 /// Yerel Pushizo SDK'sı olmayan hedefler (Windows, MacCatalyst, platformdan bağımsız net8.0): yazma çağrıları
 /// etkisizdir ve bir kez uyarı günlüğe yazılır; okuma çağrıları boş değer, izin istekleri (bildirim, konum) false,
 /// bildirim kutusu, tercihler ve Live Activities <see cref="PushizoException.PlatformNotSupported"/> döndürür.
+/// Özellik bayrakları koddaki varsayılanı, gömülü yerleşimler boş liste verir.
 /// </summary>
 internal sealed class UnsupportedPlatform : IPushizoPlatform
 {
@@ -119,4 +120,27 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
         Ignored(nameof(RequestLocationPermissionAsync));
         return Task.FromResult(false);
     }
+
+    public bool GeofencingEnabled => false;
+    public void SetGeofencingEnabled(bool enabled) => Ignored(nameof(SetGeofencingEnabled));
+
+    // Özellik bayrakları ve yerleşimler: yerel SDK'nın "değer/içerik yok" durumuyla aynı (varsayılan değer, boş liste).
+    public Task<bool> RefreshFeatureFlagsAsync()
+    {
+        Ignored(nameof(RefreshFeatureFlagsAsync));
+        return Task.FromResult(false);
+    }
+
+    public bool IsFeatureFlagEnabled(string key, bool defaultValue) => defaultValue;
+    public object? GetFeatureFlagValue(string key) => null;
+
+    public Task<IReadOnlyList<InAppMessage>> PlacementsListAsync(string key, int limit)
+    {
+        Ignored(nameof(PlacementsListAsync));
+        return Task.FromResult<IReadOnlyList<InAppMessage>>(Array.Empty<InAppMessage>());
+    }
+
+    public void PlacementsReportImpression(string messageId) => Ignored(nameof(PlacementsReportImpression));
+    public void PlacementsReportClick(string messageId, string buttonId) => Ignored(nameof(PlacementsReportClick));
+    public void PlacementsReportDismiss(string messageId) => Ignored(nameof(PlacementsReportDismiss));
 }

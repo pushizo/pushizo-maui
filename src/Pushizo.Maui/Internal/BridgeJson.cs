@@ -80,6 +80,73 @@ internal static class BridgeJson
         return ReadInboxItem(doc.RootElement);
     }
 
+    /// <summary><c>{"messages":[{"messageId","json"}]}</c> (<see cref="INativeBridge.PlacementsList"/>); kimliksiz öğe hatadır.</summary>
+    public static IReadOnlyList<InAppMessage> ParsePlacementMessages(string json)
+    {
+        using var doc = Parse(json);
+        var messages = new List<InAppMessage>();
+        if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("messages", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in arr.EnumerateArray())
+            {
+                if (element.ValueKind != JsonValueKind.Object) continue;
+                messages.Add(new InAppMessage(Str(element, "messageId") ?? throw Invalid("messageId"), Str(element, "json")));
+            }
+        }
+        return messages;
+    }
+
+    /// <summary><c>{"refreshed":bool}</c> (<see cref="INativeBridge.FeatureFlagsRefresh"/>).</summary>
+    public static bool ParseRefreshed(string json)
+    {
+        using var doc = Parse(json);
+        return doc.RootElement.ValueKind == JsonValueKind.Object && Bool(doc.RootElement, "refreshed");
+    }
+
+    /// <summary>
+    /// <c>{"value":…}</c> (<see cref="INativeBridge.FeatureFlagValue"/>) → string, bool, long (tam sayı), double,
+    /// <c>Dictionary&lt;string, object?&gt;</c> veya <c>List&lt;object?&gt;</c>; değer yoksa null.
+    /// </summary>
+    public static object? ParseFlagValue(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+        using var doc = Parse(json);
+        return doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("value", out var value)
+            ? ReadValue(value)
+            : null;
+    }
+
+    private static object? ReadValue(JsonElement e)
+    {
+        switch (e.ValueKind)
+        {
+            case JsonValueKind.String:
+                return e.GetString();
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+                return false;
+            case JsonValueKind.Number:
+                // Koşullu ifade iki dalı double'a birleştirmesin diye tam sayı ayrı döndürülür.
+                if (e.TryGetInt64(out var integer)) return integer;
+                return e.GetDouble();
+            case JsonValueKind.Object:
+            {
+                var map = new Dictionary<string, object?>(StringComparer.Ordinal);
+                foreach (var p in e.EnumerateObject()) map[p.Name] = ReadValue(p.Value);
+                return map;
+            }
+            case JsonValueKind.Array:
+            {
+                var items = new List<object?>();
+                foreach (var item in e.EnumerateArray()) items.Add(ReadValue(item));
+                return items;
+            }
+            default:
+                return null;
+        }
+    }
+
     /// <summary><c>{"key":"value"}</c> biçimindeki metin sözlüğü (tag/trigger).</summary>
     public static IReadOnlyDictionary<string, string> ParseStringMap(string? json)
     {

@@ -20,6 +20,7 @@ import com.pushizo.sdk.HsChatOpenListener
 import com.pushizo.sdk.HsClickEvent
 import com.pushizo.sdk.HsForegroundEvent
 import com.pushizo.sdk.HsInAppClickEvent
+import com.pushizo.sdk.HsInAppMessage
 import com.pushizo.sdk.HsInAppLifecycleEvent
 import com.pushizo.sdk.HsInAppLifecycleListener
 import com.pushizo.sdk.HsInboxItem
@@ -60,6 +61,7 @@ interface PushizoMauiPermissionCallback {
  */
 object PushizoMauiBridge {
     private const val MAX_PENDING_FOREGROUND = 32
+    private const val MAX_PLACEMENT_MESSAGES = 50
 
     @Volatile private var listener: PushizoMauiListener? = null
     @Volatile private var appContext: Context? = null
@@ -68,6 +70,11 @@ object PushizoMauiBridge {
     /** Ön planda bekleyen bildirim kararları (`foreground` olayının `eventId`'si → olay). */
     private val foregroundEvents = object : LinkedHashMap<String, HsForegroundEvent>() {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, HsForegroundEvent>?): Boolean = size > MAX_PENDING_FOREGROUND
+    }
+
+    /** Son `placementsList` yanıtlarındaki mesajlar (kimlik → yerel nesne); rapor çağrıları mesajı buradan bulur. */
+    private val placementMessages = object : LinkedHashMap<String, HsInAppMessage>() {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, HsInAppMessage>?): Boolean = size > MAX_PLACEMENT_MESSAGES
     }
 
     private val permissionLock = Any()
@@ -543,6 +550,72 @@ object PushizoMauiBridge {
         val requested = info.requestedPermissions?.toSet().orEmpty()
         locationPermissions.filter { it in requested }
     }.getOrDefault(emptyList())
+
+    /** Arka plan bölge izleme açık mı (kalıcı tercih; ADR-0065, varsayılan kapalı). */
+    @JvmStatic fun geofencingEnabled(): Boolean = Pushizo.Location.isGeofencingEnabled
+
+    /** Bölge izlemeyi açar/kapatır; köprü izin istemez, manifest'e izin eklemez (`ACCESS_BACKGROUND_LOCATION` ve play-services-location uygulamanındır). */
+    @JvmStatic fun updateGeofencingEnabled(enabled: Boolean) = Pushizo.Location.setGeofencingEnabled(enabled)
+
+    // --- Özellik bayrakları (ADR-0066) ---
+
+    /** Değerleri hemen yeniler; başarı JSON'u `{"refreshed":bool}` (arka plan iş parçacığında). */
+    @JvmStatic
+    fun featureFlagsRefresh(result: PushizoMauiResult) =
+        Pushizo.FeatureFlags.refresh { ok -> result.onResult(JSONObject().put("refreshed", ok).toString(), null, null) }
+
+    /** Bayrak açık mı; değer henüz yoksa `fallback`. */
+    @JvmStatic fun featureFlagEnabled(key: String, fallback: Boolean): Boolean = Pushizo.FeatureFlags.isEnabled(key, fallback)
+
+    /** `{"value":…}` (metin, sayı, mantıksal, nesne veya dizi); değer yoksa null. */
+    @JvmStatic
+    fun featureFlagValue(key: String): String? =
+        Pushizo.FeatureFlags.getValue(key)?.let { JSONObject().put("value", it).toString() }
+
+    // --- Gömülü yerleşimler (ADR-0068) ---
+
+    /**
+     * Alanın içeriği; başarı JSON'u `{"messages":[{"messageId","json"}]}` (arka plan iş parçacığında). Anahtar ve limit
+     * doğrulaması yerel SDK'dadır (geçersizse `INVALID_ARGUMENT`); ağ hatasında liste boştur. Dönen mesajlar rapor
+     * çağrıları için kimliğe göre saklanır (en çok [MAX_PLACEMENT_MESSAGES]).
+     */
+    @JvmStatic
+    fun placementsList(key: String, limit: Int, result: PushizoMauiResult) {
+        try {
+            Pushizo.Placements.list(key, limit) { messages ->
+                synchronized(placementMessages) {
+                    messages.forEach { placementMessages.remove(it.id); placementMessages[it.id] = it }
+                }
+                val array = JSONArray()
+                messages.forEach { array.put(JSONObject().put("messageId", it.id).put("json", it.toJson())) }
+                result.onResult(JSONObject().put("messages", array).toString(), null, null)
+            }
+        } catch (e: Exception) {
+            result.onResult(null, errorCode(e), e.message ?: errorCode(e))
+        }
+    }
+
+    @JvmStatic
+    fun placementsReportImpression(messageId: String) {
+        placementMessage(messageId)?.let(Pushizo.Placements::reportImpression)
+    }
+
+    @JvmStatic
+    fun placementsReportClick(messageId: String, buttonId: String) {
+        placementMessage(messageId)?.let { Pushizo.Placements.reportClick(it, buttonId) }
+    }
+
+    @JvmStatic
+    fun placementsReportDismiss(messageId: String) {
+        placementMessage(messageId)?.let(Pushizo.Placements::reportDismiss)
+    }
+
+    /** Önbellekte olmayan mesaj (eski liste, yeniden başlatma) sessizce yok sayılır. */
+    private fun placementMessage(messageId: String): HsInAppMessage? {
+        val message = synchronized(placementMessages) { placementMessages[messageId] }
+        if (message == null) HsLog.d("yerleşim raporu yok sayıldı: mesaj önbellekte yok ($messageId)")
+        return message
+    }
 
     @JvmStatic
     fun foregroundPreventDefault(eventId: String) {

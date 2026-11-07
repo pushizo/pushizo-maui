@@ -329,7 +329,9 @@ public sealed class LiveActivitiesManager
 /// konumu oturum başında ve uygulama ön plana döndüğünde en sık 5 dakikada bir push aboneliğine yazar; izin yoksa veya
 /// gizlilik onayı (<see cref="Pushizo.SetConsentGiven"/>) verilmemişse hiçbir şey göndermez. Tercih kalıcıdır. İlk
 /// konum sunucuda KVKK açık rıza kaydı sayılır; <see cref="SetShared"/>(false) konumu ve rıza kaydını sildirir.
-/// Windows ve MacCatalyst hedeflerinde etkisizdir (<see cref="IsShared"/> ve <see cref="RequestPermissionAsync"/> false).
+/// İsteğe bağlı arka plan bölge izleme (<see cref="SetGeofencingEnabled"/>, ADR-0065) ayrıdır ve varsayılan kapalıdır.
+/// Windows ve MacCatalyst hedeflerinde etkisizdir (<see cref="IsShared"/>, <see cref="IsGeofencingEnabled"/> ve
+/// <see cref="RequestPermissionAsync"/> false).
 /// </summary>
 public sealed class LocationManager
 {
@@ -355,6 +357,98 @@ public sealed class LocationManager
     /// </summary>
     public Task<bool> RequestPermissionAsync(string? rationale = null) =>
         Pushizo.Platform().RequestLocationPermissionAsync(string.IsNullOrWhiteSpace(rationale) ? null : rationale.Trim());
+
+    /// <summary>Arka plan bölge izleme açık mı (kalıcı tercih; varsayılan kapalı). Başlatılmadan önce false.</summary>
+    public bool IsGeofencingEnabled => Pushizo.PlatformOrNull()?.GeofencingEnabled ?? false;
+
+    /// <summary>
+    /// Arka plan bölge izlemeyi açar/kapatır (ADR-0065). İzlemeyi işletim sistemi yapar; sunucuya koordinat gitmez,
+    /// yalnızca bölgeye giriş/çıkış bildirilir. Çalışması için <see cref="SetShared"/>(true) açık ve arka plan konum izni
+    /// verilmiş olmalıdır: izni ve gerekli bildirimleri (iOS <c>NSLocationAlwaysAndWhenInUseUsageDescription</c>, Android
+    /// <c>ACCESS_BACKGROUND_LOCATION</c> + <c>play-services-location</c>) uygulama ekler; köprü izin istemez.
+    /// Kapatınca kayıtlı bölgeler kaldırılır.
+    /// </summary>
+    public void SetGeofencingEnabled(bool enabled) => Pushizo.Platform().SetGeofencingEnabled(enabled);
+}
+
+/// <summary>
+/// Özellik bayrakları (<c>Pushizo.FeatureFlags</c>, ADR-0066). Değerler yerel SDK tarafından oturum başında yenilenir
+/// ve cihazda saklanır; ağ yoksa son değer, hiç alınmadıysa koddaki varsayılan döner. Gizlilik onayı beklenirken istek
+/// gönderilmez. Android ve iOS dışındaki hedeflerde okumalar varsayılanı, <see cref="RefreshAsync"/> false döndürür.
+/// </summary>
+public sealed class FeatureFlagsManager
+{
+    internal FeatureFlagsManager()
+    {
+    }
+
+    /// <summary>Değerleri hemen yeniler; başarıda true (hata son değerleri korur, false döner).</summary>
+    public Task<bool> RefreshAsync() => Pushizo.Platform().RefreshFeatureFlagsAsync();
+
+    /// <summary>Bayrak bu kullanıcı için açık mı; değer henüz yoksa (veya SDK başlatılmadıysa) <paramref name="defaultValue"/>.</summary>
+    public bool IsEnabled(string key, bool defaultValue = false) =>
+        Pushizo.PlatformOrNull()?.IsFeatureFlagEnabled(RequireKey(key), defaultValue) ?? defaultValue;
+
+    /// <summary>
+    /// Bayrağın değeri: <c>string</c>, <c>bool</c>, <c>long</c> (tam sayı), <c>double</c>,
+    /// <c>Dictionary&lt;string, object?&gt;</c> (JSON nesnesi) veya <c>List&lt;object?&gt;</c> (JSON dizisi); değer henüz
+    /// yoksa (veya SDK başlatılmadıysa) <paramref name="defaultValue"/> olduğu gibi döner.
+    /// </summary>
+    public object? GetValue(string key, object? defaultValue = null) =>
+        Pushizo.PlatformOrNull()?.GetFeatureFlagValue(RequireKey(key)) ?? defaultValue;
+
+    private static string RequireKey(string key) =>
+        string.IsNullOrWhiteSpace(key) ? throw new ArgumentException("Bayrak anahtarı gerekli.", nameof(key)) : key;
+}
+
+/// <summary>
+/// Gömülü yerleşimler (<c>Pushizo.Placements</c>, ADR-0068): uygulamanın yerleşim anahtarıyla adlandırdığı alanın
+/// içeriği in-app mesaj modeliyle gelir (<see cref="InAppMessage.Json"/> sunucunun ham mesajıdır); çizim uygulamanındır,
+/// tetikler değerlendirilmez. Gösterim liste alınınca değil içerik ekrana çizilince <see cref="ReportImpression"/> ile
+/// bildirilir; raporlar yerel SDK'nın kalıcı kuyruğuyla gider ve yalnızca son <see cref="ListAsync"/> çağrılarından dönen
+/// (en çok 50) mesaj için işlenir. Android ve iOS dışındaki hedeflerde liste boştur, raporlar etkisizdir.
+/// </summary>
+public sealed class PlacementsManager
+{
+    internal PlacementsManager()
+    {
+    }
+
+    /// <summary>
+    /// Alanın içeriği (önceliğe göre sıralı, en çok <paramref name="limit"/> mesaj; 1-10). Abonelik yokken veya gizlilik
+    /// onayı beklenirken boş liste döner. <paramref name="key"/>: küçük harfle başlar; küçük harf, rakam ve <c>_ . -</c>
+    /// (1-64 karakter).
+    /// </summary>
+    /// <exception cref="ArgumentException">Geçersiz anahtar.</exception>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="limit"/> 1-10 dışında.</exception>
+    /// <exception cref="PushizoException">Yerel SDK isteği reddetti (iOS'ta sunucu hata kodu; Android boş liste döner).</exception>
+    public Task<IReadOnlyList<InAppMessage>> ListAsync(string key, int limit = 1)
+    {
+        Validation.RequirePlacementKey(key, nameof(key));
+        Validation.RequirePlacementLimit(limit, nameof(limit));
+        return Pushizo.Platform().PlacementsListAsync(key, limit);
+    }
+
+    /// <summary>İçerik ekrana çizildi.</summary>
+    public void ReportImpression(InAppMessage message) => Pushizo.Platform().PlacementsReportImpression(RequireMessage(message).Id);
+
+    /// <summary>İçerikteki <paramref name="buttonId"/> kimlikli düğmeye tıklandı.</summary>
+    public void ReportClick(InAppMessage message, string buttonId)
+    {
+        var id = RequireMessage(message).Id;
+        if (string.IsNullOrWhiteSpace(buttonId)) throw new ArgumentException("Düğme kimliği gerekli.", nameof(buttonId));
+        Pushizo.Platform().PlacementsReportClick(id, buttonId);
+    }
+
+    /// <summary>İçerik kullanıcı tarafından kapatıldı.</summary>
+    public void ReportDismiss(InAppMessage message) => Pushizo.Platform().PlacementsReportDismiss(RequireMessage(message).Id);
+
+    private static InAppMessage RequireMessage(InAppMessage message)
+    {
+        ArgumentNullException.ThrowIfNull(message);
+        if (string.IsNullOrWhiteSpace(message.Id)) throw new ArgumentException("Mesaj kimliği gerekli.", nameof(message));
+        return message;
+    }
 }
 
 /// <summary>Hata ayıklama (<c>Pushizo.Debug</c>).</summary>

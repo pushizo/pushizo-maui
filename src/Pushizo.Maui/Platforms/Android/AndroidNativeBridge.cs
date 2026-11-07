@@ -139,6 +139,25 @@ internal sealed class AndroidNativeBridge : INativeBridge
             rationale,
             new PermissionCallback(completion));
 
+    public bool GetGeofencingEnabled() => PushizoMauiBridge.GeofencingEnabled();
+
+    public void SetGeofencingEnabled(bool enabled) => PushizoMauiBridge.UpdateGeofencingEnabled(enabled);
+
+    public void FeatureFlagsRefresh(NativeResult result) => PushizoMauiBridge.FeatureFlagsRefresh(new ResultCallback(result));
+
+    public bool FeatureFlagEnabled(string key, bool fallback) => PushizoMauiBridge.FeatureFlagEnabled(key, fallback);
+
+    public string? FeatureFlagValue(string key) => PushizoMauiBridge.FeatureFlagValue(key);
+
+    public void PlacementsList(string key, int limit, NativeResult result) =>
+        PushizoMauiBridge.PlacementsList(key, limit, new ResultCallback(result));
+
+    public void PlacementsReportImpression(string messageId) => PushizoMauiBridge.PlacementsReportImpression(messageId);
+
+    public void PlacementsReportClick(string messageId, string buttonId) => PushizoMauiBridge.PlacementsReportClick(messageId, buttonId);
+
+    public void PlacementsReportDismiss(string messageId) => PushizoMauiBridge.PlacementsReportDismiss(messageId);
+
     public void ChatCall(string method, string argsJson, NativeResult result) =>
         PushizoMauiBridge.ChatCall(method, argsJson, new ResultCallback(result));
 

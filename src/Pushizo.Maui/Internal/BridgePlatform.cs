@@ -162,6 +162,26 @@ internal sealed class BridgePlatform : IPushizoPlatform
     public Task<bool> RequestLocationPermissionAsync(string? rationale) =>
         AskPermission(completion => _bridge.RequestLocationPermission(rationale, completion));
 
+    public bool GeofencingEnabled => _bridge.GetGeofencingEnabled();
+
+    public void SetGeofencingEnabled(bool enabled) => _bridge.SetGeofencingEnabled(enabled);
+
+    public Task<bool> RefreshFeatureFlagsAsync() =>
+        Call(r => _bridge.FeatureFlagsRefresh(r), json => BridgeJson.ParseRefreshed(Require(json)));
+
+    public bool IsFeatureFlagEnabled(string key, bool defaultValue) => _bridge.FeatureFlagEnabled(key, defaultValue);
+
+    public object? GetFeatureFlagValue(string key) => BridgeJson.ParseFlagValue(_bridge.FeatureFlagValue(key));
+
+    public Task<IReadOnlyList<InAppMessage>> PlacementsListAsync(string key, int limit) =>
+        Call(r => _bridge.PlacementsList(key, limit, r), json => BridgeJson.ParsePlacementMessages(Require(json)));
+
+    public void PlacementsReportImpression(string messageId) => _bridge.PlacementsReportImpression(messageId);
+
+    public void PlacementsReportClick(string messageId, string buttonId) => _bridge.PlacementsReportClick(messageId, buttonId);
+
+    public void PlacementsReportDismiss(string messageId) => _bridge.PlacementsReportDismiss(messageId);
+
     /// <summary>Yerel izin geri çağrısını (herhangi bir iş parçacığından, bir kez) Task'a çevirir.</summary>
     private static Task<bool> AskPermission(Action<Action<bool>> invoke)
     {

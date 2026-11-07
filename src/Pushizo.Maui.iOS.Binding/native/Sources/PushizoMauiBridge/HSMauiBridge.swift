@@ -24,6 +24,11 @@ public final class HSMauiBridge: NSObject {
     private static var cachedPermission = false
     private static var cachedStateKnown = false
     private static let lifecycleRelay = LifecycleRelay()
+    private static let maxPlacementMessages = 50
+    /// Son `placementsList` yanıtlarındaki mesajlar (kimlik → yerel değer); rapor çağrıları mesajı buradan bulur.
+    private static var placementMessages: [String: HSInAppMessage] = [:]
+    /// Önbellek sırası (en eskiden en yeniye); sınır aşılınca en eski düşer.
+    private static var placementOrder: [String] = []
 
     // MARK: Başlatma
 
@@ -435,6 +440,82 @@ public final class HSMauiBridge: NSObject {
     @objc(requestLocationPermissionWithRationale:completion:)
     public static func requestLocationPermission(rationale: String?, completion: @escaping (Bool) -> Void) {
         Pushizo.Location.requestPermission(rationale: rationale, completion: completion)
+    }
+
+    /// Arka plan bölge izleme açık mı (kalıcı tercih; ADR-0065, varsayılan kapalı).
+    @objc(geofencingEnabled)
+    public static func geofencingEnabled() -> Bool { Pushizo.Location.isGeofencingEnabled }
+
+    /// Bölge izlemeyi açar/kapatır; köprü izin istemez, Info.plist'e açıklama eklemez ("her zaman" izni uygulamanındır).
+    @objc(updateGeofencingEnabled:)
+    public static func updateGeofencingEnabled(_ enabled: Bool) { Pushizo.Location.setGeofencingEnabled(enabled) }
+
+    // MARK: Özellik bayrakları (ADR-0066)
+
+    /// Değerleri hemen yeniler; başarı JSON'u `{"refreshed":bool}`.
+    @objc(featureFlagsRefreshWithCompletion:)
+    public static func featureFlagsRefresh(completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) { jsonString(["refreshed": await Pushizo.FeatureFlags.refresh()]) }
+    }
+
+    /// Bayrak açık mı; değer henüz yoksa `fallback`.
+    @objc(featureFlagEnabled:fallback:)
+    public static func featureFlagEnabled(_ key: String, fallback: Bool) -> Bool { Pushizo.FeatureFlags.isEnabled(key, default: fallback) }
+
+    /// `{"value":…}` (metin, sayı, mantıksal, nesne veya dizi); değer yoksa nil.
+    @objc(featureFlagValue:)
+    public static func featureFlagValue(_ key: String) -> String? {
+        guard let value = Pushizo.FeatureFlags.value(key) else { return nil }
+        return jsonString(["value": value])
+    }
+
+    // MARK: Gömülü yerleşimler (ADR-0068)
+
+    /// Alanın içeriği; başarı JSON'u `{"messages":[{"messageId","json"}]}`. Anahtar ve limit doğrulaması yerel SDK'dadır
+    /// (geçersizse `INVALID_ARGUMENT`). Dönen mesajlar rapor çağrıları için kimliğe göre saklanır (en çok 50).
+    @objc(placementsList:limit:completion:)
+    public static func placementsList(_ key: String, limit: Int, completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let messages = try await Pushizo.Placements.list(key, limit: limit)
+            rememberPlacementMessages(messages)
+            return jsonString(["messages": messages.map { ["messageId": $0.id, "json": jsonString($0.raw)] }])
+        }
+    }
+
+    @objc(placementsReportImpression:)
+    public static func placementsReportImpression(_ messageId: String) {
+        if let message = placementMessage(messageId) { Pushizo.Placements.reportImpression(message) }
+    }
+
+    @objc(placementsReportClick:buttonId:)
+    public static func placementsReportClick(_ messageId: String, buttonId: String) {
+        if let message = placementMessage(messageId) { Pushizo.Placements.reportClick(message, buttonId: buttonId) }
+    }
+
+    @objc(placementsReportDismiss:)
+    public static func placementsReportDismiss(_ messageId: String) {
+        if let message = placementMessage(messageId) { Pushizo.Placements.reportDismiss(message) }
+    }
+
+    private static func rememberPlacementMessages(_ messages: [HSInAppMessage]) {
+        lock.lock(); defer { lock.unlock() }
+        for message in messages {
+            placementOrder.removeAll { $0 == message.id }
+            placementOrder.append(message.id)
+            placementMessages[message.id] = message
+        }
+        while placementOrder.count > maxPlacementMessages {
+            placementMessages.removeValue(forKey: placementOrder.removeFirst())
+        }
+    }
+
+    /// Önbellekte olmayan mesaj (eski liste, yeniden başlatma) sessizce yok sayılır.
+    private static func placementMessage(_ messageId: String) -> HSInAppMessage? {
+        lock.lock(); let message = placementMessages[messageId]; lock.unlock()
+        if message == nil, HSLog.level.rawValue >= HSLog.Level.debug.rawValue {
+            print("[Pushizo] yerleşim raporu yok sayıldı: mesaj önbellekte yok (\(messageId))")
+        }
+        return message
     }
 
     // MARK: Ön plan kararı

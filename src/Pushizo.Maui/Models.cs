@@ -104,9 +104,9 @@ public sealed record UserPreferences(IReadOnlyList<UserPreference> Preferences, 
 /// <param name="Channel"><c>null</c> veya <c>ios_push</c> | <c>android_push</c> | <c>web_push</c> | <c>email</c> | <c>sms</c>.</param>
 public sealed record PreferenceInput(string Category, bool OptedIn, string? Channel = null);
 
-/// <summary>In-app mesaj özeti (yaşam döngüsü olaylarında).</summary>
+/// <summary>In-app mesaj özeti (yaşam döngüsü olaylarında ve <see cref="PlacementsManager.ListAsync"/> sonucunda).</summary>
 /// <param name="Id">Mesaj kimliği.</param>
-/// <param name="Json">Sunucunun döndürdüğü ham mesaj JSON'u (özel işleme için).</param>
+/// <param name="Json">Sunucunun döndürdüğü ham mesaj JSON'u (özel işleme ve gömülü yerleşim çizimi için).</param>
 public sealed record InAppMessage(string Id, string? Json);
 
 /// <summary>SDK çağrısı hatası. <see cref="Code"/> sunucu hata kodu (ör. <c>NOT_FOUND</c>) veya SDK durum kodudur.</summary>

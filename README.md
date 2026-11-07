@@ -19,7 +19,7 @@
 **Install from GitHub until then · O zamana kadar GitHub'dan kurulum:**
 
 ```bash
-git clone --branch v0.1.0 https://github.com/pushizo/pushizo-maui
+git clone --branch v0.2.0 https://github.com/pushizo/pushizo-maui
 dotnet pack pushizo-maui -c Release -o ./packages   # macOS + MAUI iş yükü / workload
 dotnet add package Pushizo.Maui --source ./packages
 ```
@@ -38,8 +38,8 @@ The detailed guide below is in Turkish; code samples are language-neutral. Full 
 
 # Pushizo .NET MAUI SDK (`Pushizo.Maui`)
 
-Push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, bildirim tercihleri, konum paylaşımı ve e-posta/SMS abonelikleri için .NET MAUI
-SDK'sı. Yerel Pushizo Android (`com.pushizo:pushizo-android`) ve iOS (`Pushizo` Swift) SDK'larını sarar;
+Push bildirimleri, in-app mesajlar, bildirim kutusu, kullanıcı/tag/alias, bildirim tercihleri, konum paylaşımı, özellik
+bayrakları, gömülü yerleşimler ve e-posta/SMS abonelikleri için .NET MAUI SDK'sı. Yerel Pushizo Android (`com.pushizo:pushizo-android`) ve iOS (`Pushizo` Swift) SDK'larını sarar;
 tetik değerlendirme, çevrimdışı kuyruk, teslimat geri bildirimi ve in-app çizimi yerel SDK'dadır. API yüzeyi
 eski sağlayıcı v5 ile uyumlu ve Flutter eklentisiyle aynıdır.
 
@@ -47,7 +47,9 @@ eski sağlayıcı v5 ile uyumlu ve Flutter eklentisiyle aynıdır.
 |-------|----------|
 | `net8.0-android`, `net9.0-android` | Yerel Android SDK'sı (minSdk 23) |
 | `net8.0-ios`, `net9.0-ios` | Yerel iOS SDK'sı (iOS 15+) |
-| Diğerleri (Windows, MacCatalyst) | Çağrılar etkisizdir, bir kez uyarı yazılır; bildirim kutusu ve tercihler `PLATFORM_NOT_SUPPORTED` döndürür |
+| Diğerleri (Windows, MacCatalyst) | Çağrılar etkisizdir, bir kez uyarı yazılır; bildirim kutusu ve tercihler `PLATFORM_NOT_SUPPORTED` döndürür; özellik bayrakları koddaki varsayılanı, yerleşimler boş liste verir |
+
+Yerel SDK sürümleri: Android `com.pushizo:pushizo-android` 0.2.1, iOS `Pushizo` 0.2.0 (`Directory.Build.props`).
 
 ## Kurulum
 
@@ -287,6 +289,65 @@ Pushizo.Location.SetShared(false);               // sunucuya location: null → 
   kapatma seçeneği sunun; `SetShared(false)` sunucudaki konumu ve rıza kaydını hemen sildirir.
 - Windows ve MacCatalyst hedeflerinde konum çağrıları etkisizdir (bir kez uyarı yazılır): `IsShared` ve
   `RequestPermissionAsync` `false` döner, hata fırlatılmaz.
+
+#### Arka plan bölge izleme
+
+İsteğe bağlıdır ve varsayılan kapalıdır (ADR-0065). İzlemeyi işletim sistemi yapar; sunucuya koordinat gitmez, yalnızca
+bölgeye giriş/çıkış bildirilir. Köprü izin istemez ve manifest/Info.plist'e izin eklemez; üç koşul birlikte gerekir:
+
+```csharp
+Pushizo.Location.SetShared(true);                 // konum paylaşımı açık
+// Arka plan iznini uygulama ister, ör. MAUI: await Permissions.RequestAsync<Permissions.LocationAlways>();
+Pushizo.Location.SetGeofencingEnabled(true);      // tercih kalıcıdır; false kayıtlı bölgeleri kaldırır
+bool on = Pushizo.Location.IsGeofencingEnabled;
+```
+
+- iOS: `Info.plist` içine `NSLocationAlwaysAndWhenInUseUsageDescription` ekleyin; "her zaman" izni verilmiş olmalıdır.
+- Android: manifest'e `ACCESS_BACKGROUND_LOCATION` ekleyin ve uygulamaya `Xamarin.GooglePlayServices.Location` paketini
+  (`play-services-location`) ekleyin; yerel SDK bu bağımlılığı kendisi getirmez.
+- `SetShared(false)`, `SetGeofencingEnabled(false)` ve gizlilik onayının geri alınması kayıtlı bölgeleri kaldırır.
+  Windows ve MacCatalyst'te etkisizdir (`IsGeofencingEnabled` false).
+
+### Özellik bayrakları
+
+Değerler yerel SDK tarafından oturum başında yenilenir ve cihazda saklanır; ağ yoksa son değer, hiç alınmadıysa koddaki
+varsayılan döner (ADR-0066). Gizlilik onayı beklenirken istek gönderilmez.
+
+```csharp
+if (Pushizo.FeatureFlags.IsEnabled("yeni_sepet")) ShowNewCart();
+var limit = Convert.ToInt32(Pushizo.FeatureFlags.GetValue("sepet_limiti", 10));
+var tema = (string?)Pushizo.FeatureFlags.GetValue("tema") ?? "acik";
+bool refreshed = await Pushizo.FeatureFlags.RefreshAsync();   // hata son değerleri korur, false döner
+```
+
+- `GetValue` değeri JSON türüne göre döndürür: `string`, `bool`, `long` (tam sayı), `double`,
+  `Dictionary<string, object?>` (nesne) veya `List<object?>` (dizi); değer yoksa verilen varsayılan olduğu gibi döner.
+- `IsEnabled`/`GetValue` `Initialize` öncesinde de güvenlidir (varsayılanı döndürür); `RefreshAsync` başlatma ister.
+- Windows ve MacCatalyst'te okumalar varsayılanı, `RefreshAsync` `false` döndürür.
+
+### Gömülü yerleşimler
+
+Uygulamanın ayırdığı bir alanın içeriği in-app mesaj modeliyle gelir; çizim uygulamanındır, tetikler değerlendirilmez
+(ADR-0068). `InAppMessage.Json` sunucunun ham mesajıdır (`display` blokları, düğmeler).
+
+```csharp
+var messages = await Pushizo.Placements.ListAsync("ana_sayfa_ust", limit: 3);   // önceliğe göre sıralı
+foreach (var m in messages)
+{
+    RenderBanner(m.Json);
+    Pushizo.Placements.ReportImpression(m);           // içerik ekrana çizilince
+}
+Pushizo.Placements.ReportClick(messages[0], "cta");   // düğme kimliği
+Pushizo.Placements.ReportDismiss(messages[0]);
+```
+
+- Anahtar küçük harfle başlar; küçük harf, rakam ve `_ . -` içerir (1-64 karakter); `limit` 1-10. Geçersiz girdi
+  `ArgumentException` / `ArgumentOutOfRangeException` ile köprüye ulaşmadan reddedilir.
+- Abonelik yokken veya gizlilik onayı beklenirken liste boştur. Sunucu hatasında iOS `PushizoException` (sunucu kodu)
+  fırlatır, Android boş liste döner (yerel SDK davranışı).
+- Raporlar yerel SDK'nın kalıcı kuyruğuyla gider ve yalnızca son `ListAsync` çağrılarından dönen (en çok 50) mesaj için
+  işlenir; önbellekte olmayan mesaj sessizce yok sayılır (debug günlüğü).
+- Windows ve MacCatalyst'te liste boştur, raporlar etkisizdir.
 
 ## Mimari
 

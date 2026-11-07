@@ -184,6 +184,45 @@ internal sealed class FakeNativeBridge : INativeBridge
         ThreadPool.QueueUserWorkItem(_ => completion(LocationPermissionResult));
     }
 
+    /// <summary>Yerel SDK'daki kalıcı bölge izleme tercihi.</summary>
+    public bool GeofencingEnabledValue { get; set; }
+
+    public bool GetGeofencingEnabled() => GeofencingEnabledValue;
+
+    public void SetGeofencingEnabled(bool enabled)
+    {
+        Record($"geofencing:{enabled}");
+        GeofencingEnabledValue = enabled;
+    }
+
+    /// <summary>Bayrak yenileme yanıtı: (json, hata kodu, hata mesajı).</summary>
+    public (string? Json, string? Code, string? Message) FeatureFlagsRefreshResponse { get; set; } = ("""{"refreshed":true}""", null, null);
+
+    /// <summary>Yerel bayrak önbelleği: anahtar → (açık mı, <c>{"value":…}</c> JSON'u ya da null).</summary>
+    public Dictionary<string, (bool Enabled, string? ValueJson)> FeatureFlags { get; } = new();
+
+    public void FeatureFlagsRefresh(NativeResult result) => Respond("featureFlagsRefresh", FeatureFlagsRefreshResponse, result);
+
+    public bool FeatureFlagEnabled(string key, bool fallback)
+    {
+        Record($"featureFlagEnabled:{key}:{fallback}");
+        return FeatureFlags.TryGetValue(key, out var flag) ? flag.Enabled : fallback;
+    }
+
+    public string? FeatureFlagValue(string key)
+    {
+        Record($"featureFlagValue:{key}");
+        return FeatureFlags.TryGetValue(key, out var flag) ? flag.ValueJson : null;
+    }
+
+    /// <summary>Yerleşim yanıtı: (json, hata kodu, hata mesajı).</summary>
+    public (string? Json, string? Code, string? Message) PlacementsResponse { get; set; } = ("""{"messages":[]}""", null, null);
+
+    public void PlacementsList(string key, int limit, NativeResult result) => Respond($"placementsList:{key}:{limit}", PlacementsResponse, result);
+    public void PlacementsReportImpression(string messageId) => Record($"placementImpression:{messageId}");
+    public void PlacementsReportClick(string messageId, string buttonId) => Record($"placementClick:{messageId}:{buttonId}");
+    public void PlacementsReportDismiss(string messageId) => Record($"placementDismiss:{messageId}");
+
     public void ForegroundPreventDefault(string eventId) => Record($"preventDefault:{eventId}");
     public void ForegroundDisplay(string eventId) => Record($"display:{eventId}");
 }

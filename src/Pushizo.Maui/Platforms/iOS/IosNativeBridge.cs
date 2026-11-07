@@ -124,6 +124,26 @@ internal sealed class IosNativeBridge : INativeBridge
     public void RequestLocationPermission(string? rationale, Action<bool> completion) =>
         HSMauiBridge.RequestLocationPermission(rationale, granted => completion(granted));
 
+    public bool GetGeofencingEnabled() => HSMauiBridge.GeofencingEnabled();
+
+    public void SetGeofencingEnabled(bool enabled) => HSMauiBridge.UpdateGeofencingEnabled(enabled);
+
+    public void FeatureFlagsRefresh(NativeResult result) =>
+        HSMauiBridge.FeatureFlagsRefresh((json, code, message) => result(json, code, message));
+
+    public bool FeatureFlagEnabled(string key, bool fallback) => HSMauiBridge.FeatureFlagEnabled(key, fallback);
+
+    public string? FeatureFlagValue(string key) => HSMauiBridge.FeatureFlagValue(key);
+
+    public void PlacementsList(string key, int limit, NativeResult result) =>
+        HSMauiBridge.PlacementsList(key, limit, (json, code, message) => result(json, code, message));
+
+    public void PlacementsReportImpression(string messageId) => HSMauiBridge.PlacementsReportImpression(messageId);
+
+    public void PlacementsReportClick(string messageId, string buttonId) => HSMauiBridge.PlacementsReportClick(messageId, buttonId);
+
+    public void PlacementsReportDismiss(string messageId) => HSMauiBridge.PlacementsReportDismiss(messageId);
+
     public void ForegroundPreventDefault(string eventId) => HSMauiBridge.ForegroundPreventDefault(eventId);
 
     public void ForegroundDisplay(string eventId) => HSMauiBridge.ForegroundDisplay(eventId);
