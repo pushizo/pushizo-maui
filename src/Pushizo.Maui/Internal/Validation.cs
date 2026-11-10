@@ -118,6 +118,11 @@ internal static partial class Validation
         if (limit is < 1 or > 200) throw new ArgumentOutOfRangeException(paramName, limit, "limit 1-200 olmalı.");
     }
 
+    public static void RequireContentCardLimit(int limit, string paramName)
+    {
+        if (limit is < 1 or > 100) throw new ArgumentOutOfRangeException(paramName, limit, "limit 1-100 olmalı.");
+    }
+
     [GeneratedRegex(@"^[a-z][a-z0-9_.-]{0,63}\z", RegexOptions.CultureInvariant)]
     private static partial Regex PlacementKeyRegex();
 

@@ -60,6 +60,8 @@ internal interface IPushizoPlatform
     Task<int> InboxMarkAllReadAsync();
     Task InboxArchiveAsync(string id);
     Task<int> InboxUnreadCountAsync();
+    Task<ContentCardFeed> ContentCardsListAsync(int limit);
+    Task<ContentCard> ContentCardEventAsync(string id, string eventName);
 
     // Canlı sohbet (ADR-0040): yöntem adı + JSON argümanları yerel SDK'ya iletilir (bkz. INativeBridge.ChatCall)
     Task<string?> ChatCallAsync(string method, string argsJson);

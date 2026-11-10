@@ -105,6 +105,8 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public Task<int> InboxMarkAllReadAsync() => NotSupported<int>();
     public Task InboxArchiveAsync(string id) => NotSupported<bool>();
     public Task<int> InboxUnreadCountAsync() => NotSupported<int>();
+    public Task<ContentCardFeed> ContentCardsListAsync(int limit) => NotSupported<ContentCardFeed>();
+    public Task<ContentCard> ContentCardEventAsync(string id, string eventName) => NotSupported<ContentCard>();
     public void SendEvent(string name, Dictionary<string, object?> properties, double? value) => Ignored(nameof(SendEvent));
     public Task SetupDefaultLiveActivityAsync() => LiveActivitiesNotSupported();
 

@@ -100,6 +100,12 @@ internal sealed class IosNativeBridge : INativeBridge
     public void InboxUnreadCount(NativeResult result) =>
         HSMauiBridge.InboxUnreadCount((json, code, message) => result(json, code, message));
 
+    public void ContentCardsList(int limit, NativeResult result) =>
+        HSMauiBridge.ContentCardsList(limit, (json, code, message) => result(json, code, message));
+
+    public void ContentCardEvent(string id, string eventName, NativeResult result) =>
+        HSMauiBridge.ContentCardEvent(id, eventName, (json, code, message) => result(json, code, message));
+
     public void GetPreferences(NativeResult result) =>
         HSMauiBridge.GetPreferences((json, code, message) => result(json, code, message));
 

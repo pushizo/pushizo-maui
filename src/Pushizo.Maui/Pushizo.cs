@@ -40,6 +40,8 @@ public static class Pushizo
     public static NotificationsManager Notifications { get; } = new();
     public static InAppMessagesManager InAppMessages { get; } = new();
     public static InboxManager Inbox { get; } = new();
+    /// <summary>İçerik kartları (ADR-0082; Android ve iOS).</summary>
+    public static ContentCardsManager ContentCards { get; } = new();
     /// <summary>Canlı sohbet (ADR-0040).</summary>
     public static ChatManager Chat { get; } = new();
     public static SessionManager Session { get; } = new();

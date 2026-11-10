@@ -370,6 +370,29 @@ public final class HSMauiBridge: NSObject {
         }
     }
 
+    // MARK: İçerik kartları (ADR-0082)
+
+    @objc(contentCardsListWithLimit:completion:)
+    public static func contentCardsList(limit: Int, completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let feed = try await Pushizo.ContentCards.list(limit: limit)
+            return jsonString(["cards": feed.cards.map { cardJson($0) }, "unviewedCount": feed.unviewedCount])
+        }
+    }
+
+    /// `eventName`: impression | click | dismiss; başka değer INVALID_ARGUMENT.
+    @objc(contentCardEvent:eventName:completion:)
+    public static func contentCardEvent(_ id: String, eventName: String, completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let card: HSContentCard
+            if eventName == "impression" { card = try await Pushizo.ContentCards.logImpression(id) }
+            else if eventName == "click" { card = try await Pushizo.ContentCards.logClick(id) }
+            else if eventName == "dismiss" { card = try await Pushizo.ContentCards.dismiss(id) }
+            else { throw HSError.invalidArgument("Kart olayı impression, click veya dismiss olmalı") }
+            return jsonString(cardJson(card))
+        }
+    }
+
     // MARK: Tercihler (ADR-0019 §4)
 
     /// Başarı JSON'u: `{"preferences":[…],"categories":[…]}` (bkz. `preferencesResultJson`).
@@ -737,6 +760,26 @@ public final class HSMauiBridge: NSObject {
 
     private static func preferencesResultJson(_ r: HSPreferencesResult) -> [String: Any] {
         ["preferences": r.preferences.map { preferenceJson($0) }, "categories": r.categories.map { categoryJson($0) }]
+    }
+
+    private static func cardJson(_ card: HSContentCard) -> [String: Any] {
+        [
+            "id": card.id,
+            "messageId": card.messageId ?? NSNull(),
+            "type": card.type.rawValue,
+            "title": card.title ?? NSNull(),
+            "body": card.body ?? NSNull(),
+            "url": card.url ?? NSNull(),
+            "imageUrl": card.imageUrl ?? NSNull(),
+            "buttonText": card.buttonText ?? NSNull(),
+            "data": card.data,
+            "pinned": card.pinned,
+            "priority": card.priority,
+            "viewed": card.viewed,
+            "clicked": card.clicked,
+            "expiresAt": millis(card.expiresAt),
+            "createdAt": millis(card.createdAt),
+        ]
     }
 
     private static func pageJson(_ page: HSInboxPage) -> [String: Any] {

@@ -197,6 +197,14 @@ namespace PushizoSdk.Native.iOS
         void InboxUnreadCount (HSMauiResultHandler completion);
 
         [Static]
+        [Export ("contentCardsListWithLimit:completion:")]
+        void ContentCardsList (nint limit, HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("contentCardEvent:eventName:completion:")]
+        void ContentCardEvent (string id, string eventName, HSMauiResultHandler completion);
+
+        [Static]
         [Export ("getPreferencesWithCompletion:")]
         void GetPreferences (HSMauiResultHandler completion);
 

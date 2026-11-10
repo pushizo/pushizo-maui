@@ -23,6 +23,8 @@ import com.pushizo.sdk.HsInAppClickEvent
 import com.pushizo.sdk.HsInAppMessage
 import com.pushizo.sdk.HsInAppLifecycleEvent
 import com.pushizo.sdk.HsInAppLifecycleListener
+import com.pushizo.sdk.HsContentCard
+import com.pushizo.sdk.HsContentCardFeed
 import com.pushizo.sdk.HsInboxItem
 import com.pushizo.sdk.HsInboxPage
 import com.pushizo.sdk.HsLog
@@ -375,6 +377,22 @@ object PushizoMauiBridge {
     @JvmStatic
     fun inboxUnreadCount(result: PushizoMauiResult) =
         Pushizo.Inbox.unreadCount(reply<Int>(result) { JSONObject().put("unreadCount", it).toString() })
+
+    // --- İçerik kartları (ADR-0082) ---
+
+    @JvmStatic
+    fun contentCardsList(limit: Int, result: PushizoMauiResult) =
+        Pushizo.ContentCards.list(limit, reply<HsContentCardFeed>(result) { cardFeedJson(it).toString() })
+
+    /** eventName: impression | click | dismiss; başka değer INVALID_ARGUMENT. */
+    @JvmStatic
+    fun contentCardEvent(id: String, eventName: String, result: PushizoMauiResult) {
+        val callback = reply<HsContentCard>(result) { cardJson(it).toString() }
+        if (eventName == "impression") Pushizo.ContentCards.logImpression(id, callback)
+        else if (eventName == "click") Pushizo.ContentCards.logClick(id, callback)
+        else if (eventName == "dismiss") Pushizo.ContentCards.dismiss(id, callback)
+        else result.onResult(null, "INVALID_ARGUMENT", "Kart olayı impression, click veya dismiss olmalı.")
+    }
 
     // --- Canlı sohbet (ADR-0040) ---
 
@@ -740,6 +758,29 @@ object PushizoMauiBridge {
         val categories = JSONArray()
         r.categories.forEach { categories.put(categoryJson(it)) }
         return JSONObject().put("preferences", preferences).put("categories", categories)
+    }
+
+    private fun cardJson(c: HsContentCard): JSONObject = JSONObject()
+        .put("id", c.id)
+        .put("messageId", nullable(c.messageId))
+        .put("type", c.type.wire)
+        .put("title", nullable(c.title))
+        .put("body", nullable(c.body))
+        .put("url", nullable(c.url))
+        .put("imageUrl", nullable(c.imageUrl))
+        .put("buttonText", nullable(c.buttonText))
+        .put("data", JSONObject(c.data))
+        .put("pinned", c.pinned)
+        .put("priority", c.priority)
+        .put("viewed", c.viewed)
+        .put("clicked", c.clicked)
+        .put("expiresAt", nullable(c.expiresAt))
+        .put("createdAt", nullable(c.createdAt))
+
+    private fun cardFeedJson(f: HsContentCardFeed): JSONObject {
+        val cards = JSONArray()
+        f.cards.forEach { cards.put(cardJson(it)) }
+        return JSONObject().put("cards", cards).put("unviewedCount", f.unviewedCount)
     }
 
     private fun pageJson(p: HsInboxPage): JSONObject {

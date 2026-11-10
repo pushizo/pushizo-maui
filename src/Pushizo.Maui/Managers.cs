@@ -249,6 +249,36 @@ public sealed class InboxManager
         string.IsNullOrWhiteSpace(id) ? throw new ArgumentException("Öğe kimliği gerekli.", nameof(id)) : id;
 }
 
+/// <summary>
+/// İçerik kartları (<c>Pushizo.ContentCards</c>, ADR-0082): kalıcı kart akışı. Gösterimde <see cref="LogImpressionAsync"/>,
+/// tıklamada <see cref="LogClickAsync"/>, kapatmada <see cref="DismissAsync"/> çağrılır.
+/// </summary>
+public sealed class ContentCardsManager
+{
+    internal ContentCardsManager()
+    {
+    }
+
+    /// <summary>Kart akışı (<paramref name="limit"/> 1-100).</summary>
+    public Task<ContentCardFeed> ListAsync(int limit = 50)
+    {
+        Validation.RequireContentCardLimit(limit, nameof(limit));
+        return Pushizo.Platform().ContentCardsListAsync(limit);
+    }
+
+    /// <summary>Kart ekranda gösterildi (ilk gösterim kaydedilir).</summary>
+    public Task<ContentCard> LogImpressionAsync(string id) => Pushizo.Platform().ContentCardEventAsync(RequireId(id), "impression");
+
+    /// <summary>Karta tıklandı (gösterim de sayılır).</summary>
+    public Task<ContentCard> LogClickAsync(string id) => Pushizo.Platform().ContentCardEventAsync(RequireId(id), "click");
+
+    /// <summary>Kart kapatıldı; akıştan kalkar.</summary>
+    public Task<ContentCard> DismissAsync(string id) => Pushizo.Platform().ContentCardEventAsync(RequireId(id), "dismiss");
+
+    private static string RequireId(string id) =>
+        string.IsNullOrWhiteSpace(id) ? throw new ArgumentException("Kart kimliği gerekli.", nameof(id)) : id;
+}
+
 /// <summary>Oturum ve özel olaylar (<c>Pushizo.Session</c>).</summary>
 public sealed class SessionManager
 {

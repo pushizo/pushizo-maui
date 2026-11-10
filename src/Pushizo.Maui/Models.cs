@@ -59,6 +59,37 @@ public sealed record InboxItem
     public DateTimeOffset? CreatedAt { get; init; }
 }
 
+/// <summary>İçerik kartı türü (ADR-0082).</summary>
+public enum ContentCardType
+{
+    Classic,
+    CaptionedImage,
+    ImageOnly,
+}
+
+/// <summary>İçerik kartı (ADR-0082); kartlar bildirim kutusunda görünmez.</summary>
+public sealed record ContentCard
+{
+    public required string Id { get; init; }
+    public string? MessageId { get; init; }
+    public ContentCardType Type { get; init; }
+    public string? Title { get; init; }
+    public string? Body { get; init; }
+    public string? Url { get; init; }
+    public string? ImageUrl { get; init; }
+    public string? ButtonText { get; init; }
+    public IReadOnlyDictionary<string, string> Data { get; init; } = EmptyStringMap.Instance;
+    public bool Pinned { get; init; }
+    public int Priority { get; init; }
+    public bool Viewed { get; init; }
+    public bool Clicked { get; init; }
+    public DateTimeOffset? ExpiresAt { get; init; }
+    public DateTimeOffset? CreatedAt { get; init; }
+}
+
+/// <summary>Kart akışı (sabitlenmiş → öncelik → yeni) ve görülmemiş kart sayısı.</summary>
+public sealed record ContentCardFeed(IReadOnlyList<ContentCard> Cards, int UnviewedCount);
+
 /// <summary>Bildirim kutusu sayfası (yeniden eskiye).</summary>
 public sealed record InboxPage(IReadOnlyList<InboxItem> Items, int UnreadCount, string? NextCursor, bool HasMore);
 

@@ -80,6 +80,30 @@ internal static class BridgeJson
         return ReadInboxItem(doc.RootElement);
     }
 
+    public static ContentCardFeed ParseContentCardFeed(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        var cards = new List<ContentCard>();
+        if (root.TryGetProperty("cards", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in arr.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.Object) cards.Add(ReadContentCard(element));
+            }
+        }
+        var unviewed = root.TryGetProperty("unviewedCount", out var u) && u.ValueKind == JsonValueKind.Number
+            ? u.GetInt32()
+            : cards.Count(c => !c.Viewed);
+        return new ContentCardFeed(cards, unviewed);
+    }
+
+    public static ContentCard ParseContentCard(string json)
+    {
+        using var doc = Parse(json);
+        return ReadContentCard(doc.RootElement);
+    }
+
     /// <summary><c>{"messages":[{"messageId","json"}]}</c> (<see cref="INativeBridge.PlacementsList"/>); kimliksiz öğe hatadır.</summary>
     public static IReadOnlyList<InAppMessage> ParsePlacementMessages(string json)
     {
@@ -345,6 +369,30 @@ internal static class BridgeJson
                 : null,
         };
     }
+
+    private static ContentCard ReadContentCard(JsonElement e) => new()
+    {
+        Id = Str(e, "id") ?? throw Invalid("id"),
+        MessageId = Str(e, "messageId"),
+        Type = Str(e, "type") switch
+        {
+            "captioned_image" => ContentCardType.CaptionedImage,
+            "image_only" => ContentCardType.ImageOnly,
+            _ => ContentCardType.Classic,
+        },
+        Title = Str(e, "title"),
+        Body = Str(e, "body"),
+        Url = Str(e, "url"),
+        ImageUrl = Str(e, "imageUrl"),
+        ButtonText = Str(e, "buttonText"),
+        Data = e.TryGetProperty("data", out var data) ? ReadStringMap(data) : EmptyStringMap.Instance,
+        Pinned = Bool(e, "pinned"),
+        Priority = e.TryGetProperty("priority", out var p) && p.ValueKind == JsonValueKind.Number ? p.GetInt32() : 0,
+        Viewed = Bool(e, "viewed"),
+        Clicked = Bool(e, "clicked"),
+        ExpiresAt = Millis(e, "expiresAt"),
+        CreatedAt = Millis(e, "createdAt"),
+    };
 
     private static InboxItem ReadInboxItem(JsonElement e) => new()
     {

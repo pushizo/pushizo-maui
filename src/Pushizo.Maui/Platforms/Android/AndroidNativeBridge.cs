@@ -105,6 +105,12 @@ internal sealed class AndroidNativeBridge : INativeBridge
     public void InboxUnreadCount(NativeResult result) =>
         PushizoMauiBridge.InboxUnreadCount(new ResultCallback(result));
 
+    public void ContentCardsList(int limit, NativeResult result) =>
+        PushizoMauiBridge.ContentCardsList(limit, new ResultCallback(result));
+
+    public void ContentCardEvent(string id, string eventName, NativeResult result) =>
+        PushizoMauiBridge.ContentCardEvent(id, eventName, new ResultCallback(result));
+
     public void GetPreferences(NativeResult result) =>
         PushizoMauiBridge.GetPreferences(new ResultCallback(result));
 

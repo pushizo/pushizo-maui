@@ -99,6 +99,12 @@ internal interface INativeBridge
     /// <summary>Başarı JSON'u: <c>{"unreadCount":n}</c>.</summary>
     void InboxUnreadCount(NativeResult result);
 
+    /// <summary>İçerik kartları (ADR-0082): <c>{"cards":[…],"unviewedCount":n}</c>.</summary>
+    void ContentCardsList(int limit, NativeResult result);
+
+    /// <summary>Kart olayı (<c>impression</c>, <c>click</c>, <c>dismiss</c>); güncel kartı döndürür.</summary>
+    void ContentCardEvent(string id, string eventName, NativeResult result);
+
     /// <summary>
     /// Başarı JSON'u: <c>{"preferences":[{"category","channel","optedIn","explicit","source","updatedAt"}],
     /// "categories":[{"key","name":{},"description":{},"channels":[…]|null,"defaultOptedIn"}]}</c>.
