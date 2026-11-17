@@ -197,6 +197,44 @@ internal sealed class FakeNativeBridge : INativeBridge
         GeofencingEnabledValue = enabled;
     }
 
+    /// <summary>Yerel teslim durumu JSON'u (null: teşhis yok).</summary>
+    public string? DeliveryStatusJson { get; set; }
+
+    /// <summary><c>shouldShowGuidance</c>, <c>openSettings</c> ve <c>showGuidance</c> sonucu.</summary>
+    public bool DeliveryResult { get; set; } = true;
+
+    /// <summary>Teslimat çağrılarında fırlatılacak yerel hata (JNI hatası benzetimi).</summary>
+    public Exception? DeliveryFailure { get; set; }
+
+    public string? DeliveryStatus()
+    {
+        Record("deliveryStatus");
+        if (DeliveryFailure is not null) throw DeliveryFailure;
+        return DeliveryStatusJson;
+    }
+
+    public bool DeliveryShouldShowGuidance(int minIntervalDays)
+    {
+        Record($"deliveryShouldShowGuidance:{minIntervalDays}");
+        if (DeliveryFailure is not null) throw DeliveryFailure;
+        return DeliveryResult;
+    }
+
+    public bool DeliveryOpenSettings(string setting)
+    {
+        Record($"deliveryOpenSettings:{setting}");
+        if (DeliveryFailure is not null) throw DeliveryFailure;
+        return DeliveryResult;
+    }
+
+    public void DeliveryShowGuidance(string setting, string? message, Action<bool> completion)
+    {
+        Record($"deliveryShowGuidance:{setting}:{message ?? "<null>"}");
+        if (DeliveryFailure is not null) throw DeliveryFailure;
+        // Gerçek köprü sonucu arayüz iş parçacığından döndürür.
+        ThreadPool.QueueUserWorkItem(_ => completion(DeliveryResult));
+    }
+
     /// <summary>Bayrak yenileme yanıtı: (json, hata kodu, hata mesajı).</summary>
     public (string? Json, string? Code, string? Message) FeatureFlagsRefreshResponse { get; set; } = ("""{"refreshed":true}""", null, null);
 

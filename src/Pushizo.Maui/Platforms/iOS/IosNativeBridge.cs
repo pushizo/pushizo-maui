@@ -134,6 +134,15 @@ internal sealed class IosNativeBridge : INativeBridge
 
     public void SetGeofencingEnabled(bool enabled) => HSMauiBridge.UpdateGeofencingEnabled(enabled);
 
+    // Android teslimat güçlendirme (ADR-0092) iOS'ta yoktur: yerel çağrı yapılmaz; durum yok, diğerleri etkisiz false.
+    public string? DeliveryStatus() => null;
+
+    public bool DeliveryShouldShowGuidance(int minIntervalDays) => false;
+
+    public bool DeliveryOpenSettings(string setting) => false;
+
+    public void DeliveryShowGuidance(string setting, string? message, Action<bool> completion) => completion(false);
+
     public void FeatureFlagsRefresh(NativeResult result) =>
         HSMauiBridge.FeatureFlagsRefresh((json, code, message) => result(json, code, message));
 

@@ -120,6 +120,68 @@ internal static class BridgeJson
         return messages;
     }
 
+    /// <summary><see cref="DeliverySetting"/> → köprü değeri (<c>auto_start</c> …).</summary>
+    public static string DeliverySettingWire(DeliverySetting setting) => setting switch
+    {
+        DeliverySetting.Notifications => "notifications",
+        DeliverySetting.AutoStart => "auto_start",
+        DeliverySetting.BatteryOptimization => "battery_optimization",
+        DeliverySetting.AppDetails => "app_details",
+        _ => "auto",
+    };
+
+    /// <summary>
+    /// Android teslim durumu (<see cref="INativeBridge.DeliveryStatus"/>, ADR-0092). JSON yoksa (iOS, başlatılmamış yerel
+    /// SDK) <see cref="DeliveryStatus.Unsupported"/>; yerel SDK'nın ileride ekleyeceği, bu sürümün tanımadığı ayar ekranı atlanır.
+    /// </summary>
+    public static DeliveryStatus ParseDeliveryStatus(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return DeliveryStatus.Unsupported;
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new PushizoException(PushizoException.InvalidResponse, "Köprü yanıtı JSON nesnesi değil.");
+        var settings = new List<DeliverySetting>();
+        if (root.TryGetProperty("recommendedSettings", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in arr.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String) continue;
+                switch (item.GetString())
+                {
+                    case "notifications": settings.Add(DeliverySetting.Notifications); break;
+                    case "auto_start": settings.Add(DeliverySetting.AutoStart); break;
+                    case "battery_optimization": settings.Add(DeliverySetting.BatteryOptimization); break;
+                    case "app_details": settings.Add(DeliverySetting.AppDetails); break;
+                }
+            }
+        }
+        return new DeliveryStatus
+        {
+            Supported = true,
+            Manufacturer = Str(root, "manufacturer") ?? string.Empty,
+            Brand = Str(root, "brand") ?? string.Empty,
+            Vendor = Str(root, "vendor") ?? "other",
+            AggressiveVendor = Bool(root, "aggressiveVendor"),
+            Rom = Str(root, "rom") ?? string.Empty,
+            RomVersion = Str(root, "romVersion"),
+            NotificationsEnabled = Bool(root, "notificationsEnabled"),
+            ChannelBlocked = Bool(root, "channelBlocked"),
+            BatteryOptimizationExempt = Bool(root, "batteryOptimizationExempt"),
+            BackgroundRestricted = Bool(root, "backgroundRestricted"),
+            StandbyBucket = Str(root, "standbyBucket"),
+            PowerSaveMode = Bool(root, "powerSaveMode"),
+            DataSaverEnabled = Bool(root, "dataSaverEnabled"),
+            Restricted = Bool(root, "restricted"),
+            Risk = Str(root, "risk") switch
+            {
+                "high" => DeliveryRisk.High,
+                "elevated" => DeliveryRisk.Elevated,
+                _ => DeliveryRisk.None,
+            },
+            RecommendedSettings = settings.AsReadOnly(),
+        };
+    }
+
     /// <summary><c>{"refreshed":bool}</c> (<see cref="INativeBridge.FeatureFlagsRefresh"/>).</summary>
     public static bool ParseRefreshed(string json)
     {

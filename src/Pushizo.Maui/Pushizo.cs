@@ -47,6 +47,8 @@ public static class Pushizo
     public static SessionManager Session { get; } = new();
     public static LiveActivitiesManager LiveActivities { get; } = new();
     public static LocationManager Location { get; } = new();
+    /// <summary>Android teslimat güçlendirme (ADR-0092; yalnızca Android'de etkilidir).</summary>
+    public static DeliveryManager Delivery { get; } = new();
     /// <summary>Özellik bayrakları (ADR-0066).</summary>
     public static FeatureFlagsManager FeatureFlags { get; } = new();
     /// <summary>Gömülü yerleşimler (ADR-0068).</summary>

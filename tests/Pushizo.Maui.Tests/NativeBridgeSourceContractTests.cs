@@ -121,6 +121,34 @@ public sealed partial class NativeBridgeSourceContractTests
     }
 
     [Fact]
+    public void Delivery_bridge_calls_native_delivery_api_and_ios_stays_inert()
+    {
+        var kotlin = Kotlin;
+
+        Assert.Contains("Pushizo.Delivery.status()?.let(::deliveryStatusJson)?.toString()", kotlin);
+        Assert.Contains("Pushizo.Delivery.shouldShowGuidance(minIntervalDays)", kotlin);
+        Assert.Contains("Pushizo.Delivery.openSettings(context, deliverySetting(setting))", kotlin);
+        Assert.Contains("Pushizo.Delivery.showGuidance(activity, deliverySetting(setting), message?.takeIf { it.isNotBlank() }) { opened -> callback.onResult(opened) }", kotlin);
+        // Köprü pil optimizasyonu iznini istemez (ADR-0092 §3).
+        Assert.DoesNotContain("REQUEST_IGNORE_BATTERY_OPTIMIZATIONS", kotlin);
+
+        // C# ayrıştırıcısının okuduğu her alan Kotlin JSON'unda yazılır.
+        var parser = Read("src", "Pushizo.Maui", "Internal", "BridgeJson.cs");
+        var start = parser.IndexOf("public static DeliveryStatus ParseDeliveryStatus", StringComparison.Ordinal);
+        var body = parser[start..parser.IndexOf("ParseRefreshed", start, StringComparison.Ordinal)];
+        var fields = Regex.Matches(body, "(?:Str|Bool|TryGetProperty)\\((?:root, )?\"(\\w+)\"").Select(m => m.Groups[1].Value).ToHashSet();
+        Assert.Equal(16, fields.Count);
+        foreach (var field in fields) Assert.Contains($".put(\"{field}\", ", kotlin);
+
+        // iOS'ta teşhis yoktur: yerel çağrı (binding) eklenmez, köprü sabit yanıt verir.
+        var ios = string.Concat(PlatformSources("iOS"));
+        Assert.Contains("public string? DeliveryStatus() => null;", ios);
+        Assert.Contains("public bool DeliveryOpenSettings(string setting) => false;", ios);
+        Assert.Contains("public void DeliveryShowGuidance(string setting, string? message, Action<bool> completion) => completion(false);", ios);
+        Assert.DoesNotContain("HSMauiBridge.Delivery", ios);
+    }
+
+    [Fact]
     public void Android_bridge_resolves_location_permission_result()
     {
         var kotlin = Kotlin;

@@ -84,6 +84,14 @@ internal interface IPushizoPlatform
     bool GeofencingEnabled { get; }
     void SetGeofencingEnabled(bool enabled);
 
+    // Android teslimat güçlendirme (ADR-0092; yalnızca Android, diğer hedeflerde "desteklenmiyor" / false)
+    DeliveryStatus GetDeliveryStatus();
+    bool ShouldShowDeliveryGuidance(int minIntervalDays);
+    bool OpenDeliverySettings(DeliverySetting setting);
+
+    /// <summary><paramref name="message"/> boş değilse kırpılmıştır; null ise yerel SDK'nın yerelleştirilmiş metni kullanılır.</summary>
+    Task<bool> ShowDeliveryGuidanceAsync(DeliverySetting setting, string? message);
+
     // Özellik bayrakları (ADR-0066; değerler yerel SDK'da saklanır)
     Task<bool> RefreshFeatureFlagsAsync();
     bool IsFeatureFlagEnabled(string key, bool defaultValue);

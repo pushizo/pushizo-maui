@@ -149,6 +149,21 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public void SetGeofencingEnabled(bool enabled) => PushizoMauiBridge.UpdateGeofencingEnabled(enabled);
 
+    public string? DeliveryStatus() => PushizoMauiBridge.DeliveryStatus();
+
+    public bool DeliveryShouldShowGuidance(int minIntervalDays) => PushizoMauiBridge.DeliveryShouldShowGuidance(minIntervalDays);
+
+    public bool DeliveryOpenSettings(string setting) =>
+        PushizoMauiBridge.DeliveryOpenSettings(Microsoft.Maui.ApplicationModel.Platform.CurrentActivity, setting);
+
+    /// <summary>Diyalog Kotlin köprüsünde etkin Activity'nin arayüz iş parçacığında gösterilir; sonuç oradan bir kez gelir.</summary>
+    public void DeliveryShowGuidance(string setting, string? message, Action<bool> completion) =>
+        PushizoMauiBridge.DeliveryShowGuidance(
+            Microsoft.Maui.ApplicationModel.Platform.CurrentActivity,
+            setting,
+            message,
+            new PermissionCallback(completion));
+
     public void FeatureFlagsRefresh(NativeResult result) => PushizoMauiBridge.FeatureFlagsRefresh(new ResultCallback(result));
 
     public bool FeatureFlagEnabled(string key, bool fallback) => PushizoMauiBridge.FeatureFlagEnabled(key, fallback);

@@ -172,6 +172,15 @@ internal sealed class BridgePlatform : IPushizoPlatform
 
     public void SetGeofencingEnabled(bool enabled) => _bridge.SetGeofencingEnabled(enabled);
 
+    public DeliveryStatus GetDeliveryStatus() => BridgeJson.ParseDeliveryStatus(_bridge.DeliveryStatus());
+
+    public bool ShouldShowDeliveryGuidance(int minIntervalDays) => _bridge.DeliveryShouldShowGuidance(minIntervalDays);
+
+    public bool OpenDeliverySettings(DeliverySetting setting) => _bridge.DeliveryOpenSettings(BridgeJson.DeliverySettingWire(setting));
+
+    public Task<bool> ShowDeliveryGuidanceAsync(DeliverySetting setting, string? message) =>
+        AskPermission(completion => _bridge.DeliveryShowGuidance(BridgeJson.DeliverySettingWire(setting), message, completion));
+
     public Task<bool> RefreshFeatureFlagsAsync() =>
         Call(r => _bridge.FeatureFlagsRefresh(r), json => BridgeJson.ParseRefreshed(Require(json)));
 

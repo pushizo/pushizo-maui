@@ -25,6 +25,8 @@ import com.pushizo.sdk.HsInAppLifecycleEvent
 import com.pushizo.sdk.HsInAppLifecycleListener
 import com.pushizo.sdk.HsContentCard
 import com.pushizo.sdk.HsContentCardFeed
+import com.pushizo.sdk.HsDeliverySetting
+import com.pushizo.sdk.HsDeliveryStatus
 import com.pushizo.sdk.HsInboxItem
 import com.pushizo.sdk.HsInboxPage
 import com.pushizo.sdk.HsLog
@@ -576,6 +578,58 @@ object PushizoMauiBridge {
     @JvmStatic fun updateGeofencingEnabled(enabled: Boolean) = Pushizo.Location.setGeofencingEnabled(enabled)
 
     // --- Özellik bayrakları (ADR-0066) ---
+
+    // --- Android teslimat güçlendirme (ADR-0092): teşhis, ayar ekranı adayları ve diyalog yerel SDK'dadır ---
+
+    /** Teslim durumu JSON nesnesi olarak; yerel SDK başlatılmadıysa null. Enum değerleri küçük harfle yazılır. */
+    @JvmStatic
+    fun deliveryStatus(): String? = Pushizo.Delivery.status()?.let(::deliveryStatusJson)?.toString()
+
+    /** Teslim riski var ve hazır diyalog son `minIntervalDays` günde gösterilmedi mi. */
+    @JvmStatic
+    fun deliveryShouldShowGuidance(minIntervalDays: Int): Boolean = Pushizo.Delivery.shouldShowGuidance(minIntervalDays)
+
+    /** Ayar ekranını açar (üreticiye özgü ekran yoksa standart Android ekranı); açıldıysa true. Yerel çağrı istisna atmaz. */
+    @JvmStatic
+    fun deliveryOpenSettings(activity: Activity?, setting: String?): Boolean {
+        val context = activity ?: appContext ?: return false
+        return Pushizo.Delivery.openSettings(context, deliverySetting(setting))
+    }
+
+    /**
+     * Hazır açıklama diyaloğu (`message` boşsa SDK'nın yerelleştirilmiş metni). Sonuç arayüz iş parçacığında bir kez gelir:
+     * kullanıcı kabul etti ve ayar ekranı açıldıysa true; vazgeçildi, ekran açılamadı ya da etkin Activity yoksa false.
+     */
+    @JvmStatic
+    fun deliveryShowGuidance(activity: Activity?, setting: String?, message: String?, callback: PushizoMauiPermissionCallback) {
+        if (activity == null) {
+            callback.onResult(false)
+            return
+        }
+        Pushizo.Delivery.showGuidance(activity, deliverySetting(setting), message?.takeIf { it.isNotBlank() }) { opened -> callback.onResult(opened) }
+    }
+
+    /** C# değeri (`auto`, `notifications`, `auto_start`, `battery_optimization`, `app_details`); tanınmayan değer `AUTO`. */
+    private fun deliverySetting(wire: String?): HsDeliverySetting =
+        HsDeliverySetting.values().firstOrNull { it.name.equals(wire, ignoreCase = true) } ?: HsDeliverySetting.AUTO
+
+    private fun deliveryStatusJson(s: HsDeliveryStatus): JSONObject = JSONObject()
+        .put("manufacturer", s.manufacturer)
+        .put("brand", s.brand)
+        .put("vendor", s.vendor.id)
+        .put("aggressiveVendor", s.vendor.aggressive)
+        .put("rom", s.rom)
+        .put("romVersion", s.romVersion ?: JSONObject.NULL)
+        .put("notificationsEnabled", s.notificationsEnabled)
+        .put("channelBlocked", s.channelBlocked)
+        .put("batteryOptimizationExempt", s.batteryOptimizationExempt)
+        .put("backgroundRestricted", s.backgroundRestricted)
+        .put("standbyBucket", s.standbyBucket?.id ?: JSONObject.NULL)
+        .put("powerSaveMode", s.powerSaveMode)
+        .put("dataSaverEnabled", s.dataSaverEnabled)
+        .put("restricted", s.restricted)
+        .put("risk", s.risk.name.lowercase())
+        .put("recommendedSettings", JSONArray(s.recommendedSettings.map { it.name.lowercase() }))
 
     /** Değerleri hemen yeniler; başarı JSON'u `{"refreshed":bool}` (arka plan iş parçacığında). */
     @JvmStatic

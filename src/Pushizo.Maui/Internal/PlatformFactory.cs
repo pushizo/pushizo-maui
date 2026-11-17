@@ -126,6 +126,12 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public bool GeofencingEnabled => false;
     public void SetGeofencingEnabled(bool enabled) => Ignored(nameof(SetGeofencingEnabled));
 
+    // Android teslimat güçlendirme (ADR-0092): teşhis yok, risk yok; ayar ekranı ve diyalog açılmaz (hata fırlatılmaz).
+    public DeliveryStatus GetDeliveryStatus() => DeliveryStatus.Unsupported;
+    public bool ShouldShowDeliveryGuidance(int minIntervalDays) => false;
+    public bool OpenDeliverySettings(DeliverySetting setting) => false;
+    public Task<bool> ShowDeliveryGuidanceAsync(DeliverySetting setting, string? message) => Task.FromResult(false);
+
     // Özellik bayrakları ve yerleşimler: yerel SDK'nın "değer/içerik yok" durumuyla aynı (varsayılan değer, boş liste).
     public Task<bool> RefreshFeatureFlagsAsync()
     {

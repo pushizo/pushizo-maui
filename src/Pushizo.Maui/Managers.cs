@@ -402,6 +402,78 @@ public sealed class LocationManager
 }
 
 /// <summary>
+/// Android teslimat güçlendirme (<c>Pushizo.Delivery</c>, ADR-0092): bazı üreticilerin pil/otomatik başlatma yöneticisi
+/// arka plandaki uygulamayı durdurduğu için bildirimler gecikir ya da gelmez. Bu yüzey cihazdaki kısıtları okur ve
+/// kullanıcıyı ilgili ayar ekranına götürür. Yalnızca Android'de etkilidir: iOS, Windows ve MacCatalyst hedeflerinde ve
+/// SDK başlatılmadan önce durum <see cref="DeliveryStatus.Unsupported"/> döner, <see cref="OpenSettings"/> ile
+/// <see cref="ShowGuidanceAsync"/> hiçbir şey yapmadan false döner. Hiçbir çağrı istisna atmaz.
+/// </summary>
+public sealed class DeliveryManager
+{
+    /// <summary>Hazır diyaloğun yeniden önerilme aralığı (gün; yerel SDK varsayılanıyla aynı).</summary>
+    public const int DefaultGuidanceIntervalDays = 14;
+
+    internal DeliveryManager()
+    {
+    }
+
+    /// <summary>Cihazın teslim durumu: üretici, ROM, pil muafiyeti, arka plan kısıtı, risk ve önerilen ayar ekranları.</summary>
+    public DeliveryStatus GetStatus() =>
+        Guard(platform => platform.GetDeliveryStatus(), DeliveryStatus.Unsupported, "teslim durumu okunamadı");
+
+    /// <summary>
+    /// Hazır açıklama diyaloğu şimdi gösterilmeli mi: teslim riski var ve diyalog son <paramref name="minIntervalDays"/>
+    /// gün içinde gösterilmedi (negatif değer 0 sayılır).
+    /// </summary>
+    public bool ShouldShowGuidance(int minIntervalDays = DefaultGuidanceIntervalDays) =>
+        Guard(platform => platform.ShouldShowDeliveryGuidance(Math.Max(0, minIntervalDays)), false, "teslim yönlendirmesi denetlenemedi");
+
+    /// <summary>
+    /// Ayar ekranını açar. <see cref="DeliverySetting.Auto"/> duruma en uygun ekranı seçer; üreticiye özgü ekran
+    /// bulunamazsa standart Android ekranına düşülür. Bir ekran açıldıysa true.
+    /// </summary>
+    public bool OpenSettings(DeliverySetting setting = DeliverySetting.Auto) =>
+        Guard(platform => platform.OpenDeliverySettings(setting), false, "teslimat ayar ekranı açılamadı");
+
+    /// <summary>
+    /// Hazır açıklama diyaloğunu gösterir (22 dil; <paramref name="message"/> verilirse SDK metni yerine o gösterilir).
+    /// Kullanıcı kabul ederse <paramref name="setting"/> ekranı açılır. Sonuç: ayar ekranı açıldıysa true; kullanıcı
+    /// vazgeçtiyse, ekran açılamadıysa ya da etkin Activity yoksa false. SDK diyaloğu kendiliğinden göstermez; uygun anı
+    /// uygulama seçer (<see cref="ShouldShowGuidance"/>).
+    /// </summary>
+    public async Task<bool> ShowGuidanceAsync(DeliverySetting setting = DeliverySetting.Auto, string? message = null)
+    {
+        var platform = Pushizo.PlatformOrNull();
+        if (platform is null) return false;
+        try
+        {
+            return await platform.ShowDeliveryGuidanceAsync(setting, string.IsNullOrWhiteSpace(message) ? null : message.Trim()).ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            SdkLog.Write(LogLevel.Warn, "teslimat açıklama diyaloğu gösterilemedi", e);
+            return false;
+        }
+    }
+
+    /// <summary>Başlatılmamış SDK'da ve yerel hatada <paramref name="fallback"/> döner (bu yüzey istisna atmaz).</summary>
+    private static T Guard<T>(Func<IPushizoPlatform, T> call, T fallback, string failure)
+    {
+        var platform = Pushizo.PlatformOrNull();
+        if (platform is null) return fallback;
+        try
+        {
+            return call(platform);
+        }
+        catch (Exception e)
+        {
+            SdkLog.Write(LogLevel.Warn, failure, e);
+            return fallback;
+        }
+    }
+}
+
+/// <summary>
 /// Özellik bayrakları (<c>Pushizo.FeatureFlags</c>, ADR-0066). Değerler yerel SDK tarafından oturum başında yenilenir
 /// ve cihazda saklanır; ağ yoksa son değer, hiç alınmadıysa koddaki varsayılan döner. Gizlilik onayı beklenirken istek
 /// gönderilmez. Android ve iOS dışındaki hedeflerde okumalar varsayılanı, <see cref="RefreshAsync"/> false döndürür.

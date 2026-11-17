@@ -140,6 +140,77 @@ public sealed record PreferenceInput(string Category, bool OptedIn, string? Chan
 /// <param name="Json">Sunucunun döndürdüğü ham mesaj JSON'u (özel işleme ve gömülü yerleşim çizimi için).</param>
 public sealed record InAppMessage(string Id, string? Json);
 
+/// <summary>Bildirim teslim riski (ADR-0092; yerel Android <c>HsDeliveryRisk</c>).</summary>
+public enum DeliveryRisk
+{
+    /// <summary>Bilinen bir engel yok.</summary>
+    None = 0,
+    /// <summary>Bildirimler gecikebilir (saldırgan pil yönetimli üretici ve pil muafiyeti yok, seyrek kullanım kovası, veri tasarrufu).</summary>
+    Elevated = 1,
+    /// <summary>Bildirimler büyük olasılıkla gelmiyor (bildirim izni ya da kanalı kapalı, arka plan etkinliği kısıtlı).</summary>
+    High = 2,
+}
+
+/// <summary><see cref="DeliveryManager.OpenSettings"/> ve <see cref="DeliveryManager.ShowGuidanceAsync"/> ile açılabilen Android ayar ekranı.</summary>
+public enum DeliverySetting
+{
+    /// <summary>Duruma en uygun ekran (<see cref="DeliveryStatus.RecommendedSettings"/> ilk öğesi; öneri yoksa pil optimizasyonu).</summary>
+    Auto = 0,
+    /// <summary>Uygulamanın bildirim ayarları.</summary>
+    Notifications = 1,
+    /// <summary>Üreticinin otomatik başlatma / arka planda çalışma yöneticisi (yoksa uygulama ayrıntıları).</summary>
+    AutoStart = 2,
+    /// <summary>Pil optimizasyonu: üreticinin pil yöneticisi, yoksa sistemin pil optimizasyonu listesi.</summary>
+    BatteryOptimization = 3,
+    /// <summary>Uygulama ayrıntıları (arka plan kısıtı buradan kaldırılır).</summary>
+    AppDetails = 4,
+}
+
+/// <summary>
+/// Cihazın bildirim teslim durumu (<see cref="DeliveryManager.GetStatus"/>; yerel Android <c>HsDeliveryStatus</c>).
+/// Kişisel veri içermez: üretici, ROM ve kısıt bayrakları. Yalnızca Android'de doludur; iOS, Windows ve MacCatalyst
+/// hedeflerinde ve SDK başlatılmadan önce <see cref="Supported"/> false, <see cref="Risk"/> <see cref="DeliveryRisk.None"/>
+/// ve <see cref="RecommendedSettings"/> boştur.
+/// </summary>
+public sealed record DeliveryStatus
+{
+    /// <summary>Teşhisin desteklenmediği platformların durumu (risk yok).</summary>
+    public static DeliveryStatus Unsupported { get; } = new();
+
+    /// <summary>Teşhis bu platformda okunabildi mi.</summary>
+    public bool Supported { get; init; }
+    /// <summary><c>Build.MANUFACTURER</c> (küçük harf).</summary>
+    public string Manufacturer { get; init; } = string.Empty;
+    /// <summary><c>Build.BRAND</c> (küçük harf).</summary>
+    public string Brand { get; init; } = string.Empty;
+    /// <summary>Üretici ailesi: <c>xiaomi</c>, <c>huawei</c>, <c>honor</c>, <c>oppo</c>, <c>realme</c>, <c>oneplus</c>, <c>vivo</c>, <c>samsung</c>, <c>meizu</c>, <c>asus</c>, <c>transsion</c>, <c>other</c>.</summary>
+    public string Vendor { get; init; } = "other";
+    /// <summary>Üreticinin kendi pil/otomatik başlatma yöneticisi arka plandaki uygulamaları durdurabiliyor mu.</summary>
+    public bool AggressiveVendor { get; init; }
+    /// <summary>ROM kimliği: <c>miui</c>, <c>hyperos</c>, <c>emui</c>, <c>harmonyos</c>, <c>magicos</c>, <c>coloros</c>, <c>oxygenos</c>, <c>realmeui</c>, <c>funtouchos</c>, <c>originos</c>, <c>oneui</c>, <c>flyme</c>, <c>android</c>.</summary>
+    public string Rom { get; init; } = string.Empty;
+    public string? RomVersion { get; init; }
+    /// <summary>Bildirim izni verilmiş ve bildirimler açık mı.</summary>
+    public bool NotificationsEnabled { get; init; } = true;
+    /// <summary>Varsayılan bildirim kanalı kullanıcı tarafından kapatılmış mı.</summary>
+    public bool ChannelBlocked { get; init; }
+    /// <summary>Uygulama pil optimizasyonundan muaf mı.</summary>
+    public bool BatteryOptimizationExempt { get; init; } = true;
+    /// <summary>Kullanıcı arka plan etkinliğini kısıtlamış mı.</summary>
+    public bool BackgroundRestricted { get; init; }
+    /// <summary>Bekleme kovası: <c>exempted</c>, <c>active</c>, <c>working_set</c>, <c>frequent</c>, <c>rare</c>, <c>restricted</c> (okunamadıysa null).</summary>
+    public string? StandbyBucket { get; init; }
+    /// <summary>Pil tasarrufu kipi açık mı.</summary>
+    public bool PowerSaveMode { get; init; }
+    /// <summary>Veri tasarrufu uygulamanın arka plan verisini engelliyor mu.</summary>
+    public bool DataSaverEnabled { get; init; }
+    /// <summary>Sistem arka plan kısıtı: kullanıcı kısıtlamış ya da uygulama <c>rare</c>/<c>restricted</c> kovasında.</summary>
+    public bool Restricted { get; init; }
+    public DeliveryRisk Risk { get; init; } = DeliveryRisk.None;
+    /// <summary>Kullanıcının açması önerilen ayar ekranları (önem sırasıyla; öneri yoksa boş).</summary>
+    public IReadOnlyList<DeliverySetting> RecommendedSettings { get; init; } = Array.Empty<DeliverySetting>();
+}
+
 /// <summary>SDK çağrısı hatası. <see cref="Code"/> sunucu hata kodu (ör. <c>NOT_FOUND</c>) veya SDK durum kodudur.</summary>
 public sealed class PushizoException : Exception
 {
