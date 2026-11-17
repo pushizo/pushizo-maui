@@ -66,6 +66,7 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public void AddAliases(IReadOnlyDictionary<string, string> aliases) => Ignored(nameof(AddAliases));
     public void RemoveAlias(string label) => Ignored(nameof(RemoveAlias));
     public void SetLanguage(string languageCode) => Ignored(nameof(SetLanguage));
+    public void SetUserProperty(string key, object? value) => Ignored(nameof(SetUserProperty));
     public void AddEmail(string email) => Ignored(nameof(AddEmail));
     public void RemoveEmail(string email) => Ignored(nameof(RemoveEmail));
     public void AddSms(string phoneNumber) => Ignored(nameof(AddSms));
@@ -92,7 +93,14 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public void ClearAllNotifications() => Ignored(nameof(ClearAllNotifications));
     public void RemoveNotification(string id) => Ignored(nameof(RemoveNotification));
     public void RemoveGroupedNotifications(string group) => Ignored(nameof(RemoveGroupedNotifications));
-    public void SetBadgeCount(int count) => Ignored(nameof(SetBadgeCount));
+
+    public bool SetBadgeCount(int count)
+    {
+        Ignored(nameof(SetBadgeCount));
+        return false;
+    }
+
+    public int BadgeCount => 0;
     public void AddTriggers(IReadOnlyDictionary<string, string> triggers) => Ignored(nameof(AddTriggers));
     public void RemoveTriggers(IReadOnlyList<string> keys) => Ignored(nameof(RemoveTriggers));
     public void ClearTriggers() => Ignored(nameof(ClearTriggers));
@@ -106,6 +114,11 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     }
 
     public Task<string?> ChatCallAsync(string method, string argsJson) => NotSupported<string?>("Canlı sohbet");
+
+    // Hazır sohbet arayüzü: açma etkisiz, kapatma ve durum false (hata fırlatılmaz).
+    public void ChatShow() => Ignored(nameof(ChatShow));
+    public bool ChatHide() => false;
+    public bool ChatIsPresented => false;
     public Task<InboxPage> InboxListAsync(int limit, string? cursor) => NotSupported<InboxPage>();
     public Task<InboxItem> InboxMarkReadAsync(string id) => NotSupported<InboxItem>();
     public Task<int> InboxMarkAllReadAsync() => NotSupported<int>();
@@ -113,7 +126,7 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public Task<int> InboxUnreadCountAsync() => NotSupported<int>();
     public Task<ContentCardFeed> ContentCardsListAsync(int limit) => NotSupported<ContentCardFeed>();
     public Task<ContentCard> ContentCardEventAsync(string id, string eventName) => NotSupported<ContentCard>();
-    public void SendEvent(string name, Dictionary<string, object?> properties, double? value) => Ignored(nameof(SendEvent));
+    public void SendEvent(string name, Dictionary<string, object?> properties, double? value, string? eventId) => Ignored(nameof(SendEvent));
     public Task SetupDefaultLiveActivityAsync() => LiveActivitiesNotSupported();
 
     public Task StartDefaultLiveActivityAsync(string activityId, IReadOnlyDictionary<string, object> attributes, IReadOnlyDictionary<string, object> contentState) =>

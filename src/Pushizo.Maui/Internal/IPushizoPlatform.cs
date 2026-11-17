@@ -28,6 +28,9 @@ internal interface IPushizoPlatform
     void AddAliases(IReadOnlyDictionary<string, string> aliases);
     void RemoveAlias(string label);
     void SetLanguage(string languageCode);
+
+    /// <summary>Kullanıcı özelliği; değer kanonik ağaçtır (string, bool, long, double, sözlük, liste) ya da null (sil).</summary>
+    void SetUserProperty(string key, object? value);
     void AddEmail(string email);
     void RemoveEmail(string email);
     void AddSms(string phoneNumber);
@@ -57,8 +60,11 @@ internal interface IPushizoPlatform
     void RemoveNotification(string id);
     void RemoveGroupedNotifications(string group);
 
-    /// <summary>Uygulama rozeti (yalnızca iOS; diğer hedeflerde etkisiz). Sayı negatif değildir.</summary>
-    void SetBadgeCount(int count);
+    /// <summary>Rozet sayısı (negatif değildir). Rozet ayarlandıysa/gösterilebiliyorsa true; yerel SDK olmayan hedefte false.</summary>
+    bool SetBadgeCount(int count);
+
+    /// <summary>Güncel rozet sayısı (yerel SDK olmayan hedefte 0).</summary>
+    int BadgeCount { get; }
 
     // In-app
     void AddTriggers(IReadOnlyDictionary<string, string> triggers);
@@ -80,8 +86,13 @@ internal interface IPushizoPlatform
     // Canlı sohbet (ADR-0040): yöntem adı + JSON argümanları yerel SDK'ya iletilir (bkz. INativeBridge.ChatCall)
     Task<string?> ChatCallAsync(string method, string argsJson);
 
+    // Hazır sohbet arayüzü (yerel SDK'nın ekranı)
+    void ChatShow();
+    bool ChatHide();
+    bool ChatIsPresented { get; }
+
     // Oturum
-    void SendEvent(string name, Dictionary<string, object?> properties, double? value);
+    void SendEvent(string name, Dictionary<string, object?> properties, double? value, string? eventId);
 
     // Live Activities (yalnızca iOS; girdiler doğrulanmış ve normalize edilmiştir: değerler string, long, double, bool)
     Task SetupDefaultLiveActivityAsync();
@@ -137,6 +148,8 @@ internal interface IPushizoEventSink
     void OnInAppLifecycle(InAppLifecyclePhase phase, InAppMessage message);
     void OnChatEvent(ChatEventArgs args);
     void OnChatOpened(ChatOpenedEventArgs args);
+    void OnFeatureFlagsChanged();
+    void OnInboxChanged(InboxChangedEventArgs args);
 }
 
 internal enum InAppLifecyclePhase

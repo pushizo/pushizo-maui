@@ -94,6 +94,10 @@ namespace PushizoSdk.Native.iOS
         void SetLanguage (string code);
 
         [Static]
+        [Export ("setUserProperty:valueJson:")]
+        void SetUserProperty (string key, string valueJson);
+
+        [Static]
         [Export ("addEmail:")]
         void AddEmail (string email);
 
@@ -182,6 +186,18 @@ namespace PushizoSdk.Native.iOS
         void ChatCall (string method, string argsJson, HSMauiResultHandler completion);
 
         [Static]
+        [Export ("chatShow")]
+        void ChatShow ();
+
+        [Static]
+        [Export ("chatHide")]
+        bool ChatHide ();
+
+        [Static]
+        [Export ("chatIsPresented")]
+        bool ChatIsPresented ();
+
+        [Static]
         [Export ("inboxListWithLimit:cursor:completion:")]
         void InboxList (nint limit, [NullAllowed] string cursor, HSMauiResultHandler completion);
 
@@ -234,8 +250,12 @@ namespace PushizoSdk.Native.iOS
         void SetBadgeCount (nint count);
 
         [Static]
-        [Export ("sendEvent:propertiesJson:value:hasValue:")]
-        void SendEvent (string name, string propertiesJson, double value, bool hasValue);
+        [Export ("badgeCount")]
+        nint BadgeCount ();
+
+        [Static]
+        [Export ("sendEvent:propertiesJson:value:hasValue:eventId:")]
+        void SendEvent (string name, string propertiesJson, double value, bool hasValue, [NullAllowed] string eventId);
 
         [Static]
         [Export ("setupDefaultLiveActivityWithCompletion:")]

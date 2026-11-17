@@ -100,7 +100,49 @@ internal sealed class FakeNativeBridge : INativeBridge
 
     public void GetConsents(NativeResult result) => Respond("getConsents", ConsentsResponse, result);
     public void SetAdvertisingId(string? id) => Record($"advertisingId:{id ?? "<null>"}");
-    public void SetBadgeCount(int count) => Record($"badge:{count}");
+
+    /// <summary>Rozet çağrısının sonucu (Android: rozet gösterilebiliyor mu; iOS: her zaman true).</summary>
+    public bool BadgeResult { get; set; } = true;
+
+    /// <summary>Yerel SDK'daki rozet sayısı.</summary>
+    public int BadgeCountValue { get; private set; }
+
+    public bool SetBadgeCount(int count)
+    {
+        Record($"badge:{count}");
+        BadgeCountValue = count;
+        return BadgeResult;
+    }
+
+    public int GetBadgeCount() => BadgeCountValue;
+
+    /// <summary>SetUserProperty yanıtı (Android yerel SDK'sının anahtar hatası; null = başarı).</summary>
+    public string? UserPropertyError { get; set; }
+
+    public string? SetUserProperty(string key, string valueJson)
+    {
+        Record($"setUserProperty:{key}:{valueJson}");
+        return UserPropertyError;
+    }
+
+    /// <summary>Hazır sohbet ekranı açık mı (yerel SDK durumu).</summary>
+    public bool ChatPresented { get; private set; }
+
+    public void ChatShow()
+    {
+        Record("chatShow");
+        ChatPresented = true;
+    }
+
+    public bool ChatHide()
+    {
+        Record("chatHide");
+        var presented = ChatPresented;
+        ChatPresented = false;
+        return presented;
+    }
+
+    public bool ChatIsPresented() => ChatPresented;
 
     public string? UpdateUserJwt(string jwt)
     {
@@ -170,10 +212,14 @@ internal sealed class FakeNativeBridge : INativeBridge
     public void GetPreferences(NativeResult result) => Respond("getPreferences", PreferencesResponse, result);
     public void SetPreferences(string preferencesJson, NativeResult result) => Respond($"setPreferences:{preferencesJson}", PreferencesResponse, result);
 
-    public void SendEvent(string name, string propertiesJson, double value, bool hasValue)
+    /// <summary>Son olayın tekilleştirme kimliği (verilmediyse null).</summary>
+    public string? LastEventId { get; private set; }
+
+    public void SendEvent(string name, string propertiesJson, double value, bool hasValue, string? eventId)
     {
         Record($"sendEvent:{name}");
         LastEvent = (name, propertiesJson, value, hasValue);
+        LastEventId = eventId;
     }
 
     /// <summary>false: Android köprüsü gibi Live Activities desteklenmez.</summary>

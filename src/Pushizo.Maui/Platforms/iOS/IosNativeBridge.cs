@@ -42,6 +42,13 @@ internal sealed class IosNativeBridge : INativeBridge
 
     public void SetLanguage(string languageCode) => HSMauiBridge.SetLanguage(languageCode);
 
+    /// <summary>Yerel iOS SDK'sı geçersiz girdiyi günlüğe yazıp yok sayar; hata mesajı dönmez.</summary>
+    public string? SetUserProperty(string key, string valueJson)
+    {
+        HSMauiBridge.SetUserProperty(key, valueJson);
+        return null;
+    }
+
     public void AddEmail(string email) => HSMauiBridge.AddEmail(email);
 
     public void RemoveEmail(string email) => HSMauiBridge.RemoveEmail(email);
@@ -126,10 +133,17 @@ internal sealed class IosNativeBridge : INativeBridge
 
     public void SetAdvertisingId(string? id) => HSMauiBridge.SetAdvertisingId(id);
 
-    public void SetBadgeCount(int count) => HSMauiBridge.SetBadgeCount(count);
+    /// <summary>iOS'ta rozet her zaman ayarlanır (yerel çağrı sonuç döndürmez).</summary>
+    public bool SetBadgeCount(int count)
+    {
+        HSMauiBridge.SetBadgeCount(count);
+        return true;
+    }
 
-    public void SendEvent(string name, string propertiesJson, double value, bool hasValue) =>
-        HSMauiBridge.SendEvent(name, propertiesJson, value, hasValue);
+    public int GetBadgeCount() => (int)HSMauiBridge.BadgeCount();
+
+    public void SendEvent(string name, string propertiesJson, double value, bool hasValue, string? eventId) =>
+        HSMauiBridge.SendEvent(name, propertiesJson, value, hasValue, eventId);
 
     public bool SupportsLiveActivities => true;
 
@@ -182,6 +196,12 @@ internal sealed class IosNativeBridge : INativeBridge
     public void PlacementsReportClick(string messageId, string buttonId) => HSMauiBridge.PlacementsReportClick(messageId, buttonId);
 
     public void PlacementsReportDismiss(string messageId) => HSMauiBridge.PlacementsReportDismiss(messageId);
+
+    public void ChatShow() => HSMauiBridge.ChatShow();
+
+    public bool ChatHide() => HSMauiBridge.ChatHide();
+
+    public bool ChatIsPresented() => HSMauiBridge.ChatIsPresented();
 
     public void ForegroundPreventDefault(string eventId) => HSMauiBridge.ForegroundPreventDefault(eventId);
 

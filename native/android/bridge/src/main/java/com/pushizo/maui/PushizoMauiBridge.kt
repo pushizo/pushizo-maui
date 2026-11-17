@@ -15,6 +15,7 @@ import androidx.core.app.ActivityCompat
 import com.pushizo.sdk.Pushizo
 import com.pushizo.sdk.HsApiException
 import com.pushizo.sdk.HsCallback
+import com.pushizo.sdk.HsChatActivity
 import com.pushizo.sdk.HsChatEventAdapter
 import com.pushizo.sdk.HsChatOpenListener
 import com.pushizo.sdk.HsClickEvent
@@ -28,7 +29,9 @@ import com.pushizo.sdk.HsContentCard
 import com.pushizo.sdk.HsContentCardFeed
 import com.pushizo.sdk.HsDeliverySetting
 import com.pushizo.sdk.HsDeliveryStatus
+import com.pushizo.sdk.HsFeatureFlagObserver
 import com.pushizo.sdk.HsInboxItem
+import com.pushizo.sdk.HsInboxObserver
 import com.pushizo.sdk.HsInboxPage
 import com.pushizo.sdk.HsLog
 import com.pushizo.sdk.HsMessageCategory
@@ -133,6 +136,15 @@ object PushizoMauiBridge {
     /** Sohbet bildirimine tıklama → `chatOpen` (`{"conversationId","seq"}`; C# katmanı dinleyici yokken bekletir). */
     private val chatOpenListener = HsChatOpenListener { info -> emit("chatOpen", JSONObject(info.toMap())) }
 
+    /** Özellik bayrakları sunucudan yenilendi → `featureFlags` (`{}`; ana iş parçacığında). */
+    private val featureFlagObserver = HsFeatureFlagObserver { emit("featureFlags", JSONObject()) }
+
+    /** Bildirim kutusu değişti → `inbox` (`{"type":"listed|read|read_all|archived|count","itemId","unreadCount"}`; ana iş parçacığında). */
+    private val inboxObserver = HsInboxObserver { event -> emit("inbox", JSONObject(event.toMap())) }
+
+    /** `Pushizo.Chat.show` ile açılan hazır sohbet ekranı (yerel SDK açık ekranı dışarı vermediğinden yaşam döngüsünden izlenir). */
+    @Volatile private var chatActivity: WeakReference<Activity>? = null
+
     private val inAppLifecycleListener = object : HsInAppLifecycleListener {
         private fun send(event: String, e: HsInAppLifecycleEvent) =
             emit("inAppLifecycle", JSONObject().put("event", event).put("messageId", e.message.id).put("json", e.message.toJson()))
@@ -153,12 +165,17 @@ object PushizoMauiBridge {
             resolveLocationRequest()
         }
 
-        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {}
+        override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) {
+            if (activity is HsChatActivity) chatActivity = WeakReference(activity)
+        }
+
         override fun onActivityStarted(activity: Activity) {}
         override fun onActivityPaused(activity: Activity) {}
         override fun onActivityStopped(activity: Activity) {}
         override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) {}
-        override fun onActivityDestroyed(activity: Activity) {}
+        override fun onActivityDestroyed(activity: Activity) {
+            if (chatActivity?.get() === activity) chatActivity = null
+        }
     }
 
     /**
@@ -193,6 +210,8 @@ object PushizoMauiBridge {
             Pushizo.InAppMessages.addLifecycleListener(inAppLifecycleListener)
             Pushizo.Chat.addListener(chatListener)
             Pushizo.Chat.addOpenListener(chatOpenListener)
+            Pushizo.FeatureFlags.addObserver(featureFlagObserver)
+            Pushizo.Inbox.addObserver(inboxObserver)
             // En son: bekleyen (uygulamayı açan) tıklama bu çağrıda iletilir.
             Pushizo.Notifications.addClickListener(clickListener)
         }
@@ -254,6 +273,19 @@ object PushizoMauiBridge {
     @JvmStatic fun removeAlias(label: String) = Pushizo.User.removeAlias(label)
 
     @JvmStatic fun setLanguage(languageCode: String) = Pushizo.User.setLanguage(languageCode)
+
+    /**
+     * Kullanıcı özelliği: `valueJson` `{"value":…}` (metin, sayı, mantıksal, dizi, nesne; `null` özelliği siler). Geçersiz
+     * anahtarda hata mesajı döner (Java istisnası köprüden sızmaz), başarıda null.
+     */
+    @JvmStatic fun setUserProperty(key: String, valueJson: String): String? = try {
+        Pushizo.User.setProperty(key, toValue(JSONObject(valueJson).opt("value")))
+        null
+    } catch (e: IllegalArgumentException) {
+        e.message ?: "Geçersiz kullanıcı özelliği"
+    } catch (e: org.json.JSONException) {
+        e.message ?: "Geçersiz kullanıcı özelliği"
+    }
 
     @JvmStatic fun addEmail(email: String) = Pushizo.User.addEmail(email)
 
@@ -427,6 +459,19 @@ object PushizoMauiBridge {
 
     // --- Canlı sohbet (ADR-0040) ---
 
+    /** Hazır sohbet ekranını (`HsChatActivity`) açar; etkin Activity yoksa uygulama bağlamıyla yeni görevde açılır. */
+    @JvmStatic
+    fun chatShow(activity: Activity?) {
+        val context = activity ?: appContext ?: return
+        runCatching { Pushizo.Chat.show(context) }.onFailure { HsLog.w("sohbet ekranı açılamadı", it) }
+    }
+
+    /** `chatShow` ile açılan ekranı kapatır; açık ekran varsa true. */
+    @JvmStatic fun chatHide(): Boolean = Pushizo.Chat.hide()
+
+    /** Hazır sohbet ekranı açık mı (oluşturulmuş ve kapanmıyor). */
+    @JvmStatic fun chatIsPresented(): Boolean = chatActivity?.get()?.let { !it.isFinishing && !it.isDestroyed } ?: false
+
     /**
      * Sohbet çağrıları tek giriş noktasından (binding yüzeyi küçük kalsın diye). `method`: start, getConfig, getConversation,
      * getMessages, sendMessage, sendAttachment (base64), markRead, refreshUnreadCount, getUnreadCount, leaveOfflineMessage,
@@ -508,15 +553,26 @@ object PushizoMauiBridge {
     /** Reklam kimliği (GAID); null veya sıfır kimlik sunucudaki kaydı siler. */
     @JvmStatic fun setAdvertisingId(id: String?) = Pushizo.Ads.setAdvertisingId(id)
 
-    /** Android'de rozet görünen bildirimlerden hesaplanır; çağrı etkisizdir (iOS ile ortak yüzey için vardır). */
-    @JvmStatic fun setBadgeCount(count: Int) {
-        HsLog.d("setBadgeCount($count): Android'de etkisiz (rozet görünen bildirimlerden hesaplanır)")
-    }
+    /**
+     * Rozet sayısını yerel SDK'da saklar (sonraki bildirimlere yazılır). Sayı saklandı ve rozet bu cihazda
+     * gösterilebiliyorsa true; Android 8 öncesi, bildirimler kapalı ya da kanal rozeti kapalıysa false.
+     */
+    @JvmStatic fun setBadgeCount(count: Int): Boolean = Pushizo.Notifications.setBadgeCount(count)
 
-    /** `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez. */
+    /** `setBadgeCount` ile saklanan son sayı. */
+    @JvmStatic fun badgeCount(): Int = Pushizo.Notifications.badgeCount
+
+    /**
+     * `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez. `eventId`
+     * (isteğe bağlı) tekilleştirme kimliğidir; biçimi geçersizse yerel SDK kendi kimliğini üretir.
+     */
     @JvmStatic
-    fun sendEvent(name: String, propertiesJson: String, value: Double, hasValue: Boolean) =
-        Pushizo.Session.sendEvent(name, toMap(JSONObject(propertiesJson)), if (hasValue) value else null)
+    fun sendEvent(name: String, propertiesJson: String, value: Double, hasValue: Boolean, eventId: String?) {
+        val properties = toMap(JSONObject(propertiesJson))
+        val amount = if (hasValue) value else null
+        if (eventId == null) Pushizo.Session.sendEvent(name, properties, amount)
+        else Pushizo.Session.sendEvent(name, properties, amount, eventId)
+    }
 
     // --- Konum (v2 Faz 17b; yalnızca ön plan, gönderim yerel SDK'da) ---
 

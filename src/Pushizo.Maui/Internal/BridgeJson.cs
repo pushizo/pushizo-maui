@@ -277,6 +277,28 @@ internal static class BridgeJson
     }
 
     /// <summary>
+    /// <c>inbox</c> olayı: <c>{"type":"listed|read|read_all|archived|count","itemId","unreadCount"}</c> (<c>itemId</c> yalnızca
+    /// tek öğe olaylarında). Bilinmeyen tür (daha yeni yerel köprü) null döner.
+    /// </summary>
+    public static InboxChangedEventArgs? ParseInboxChange(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        InboxChangeType? type = Str(root, "type") switch
+        {
+            "listed" => InboxChangeType.Listed,
+            "read" => InboxChangeType.Read,
+            "read_all" => InboxChangeType.ReadAll,
+            "archived" => InboxChangeType.Archived,
+            "count" => InboxChangeType.Count,
+            _ => null,
+        };
+        if (type is not { } kind) return null;
+        var unread = root.TryGetProperty("unreadCount", out var u) && u.ValueKind == JsonValueKind.Number && u.TryGetInt32(out var n) ? Math.Max(0, n) : 0;
+        return new InboxChangedEventArgs(kind, Str(root, "itemId"), unread);
+    }
+
+    /// <summary>
     /// <c>{"preferences":[…],"categories":[…]}</c> (<see cref="INativeBridge.GetPreferences"/>). Kategorisiz tercih
     /// <see cref="PushizoException.InvalidResponse"/> verir; anahtarsız kategori atlanır (yerel SDK'larla aynı).
     /// </summary>

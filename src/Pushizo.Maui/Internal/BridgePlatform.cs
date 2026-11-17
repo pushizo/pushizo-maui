@@ -70,6 +70,11 @@ internal sealed class BridgePlatform : IPushizoPlatform
 
     public void SetLanguage(string languageCode) => _bridge.SetLanguage(languageCode);
 
+    public void SetUserProperty(string key, object? value)
+    {
+        if (_bridge.SetUserProperty(key, EventProperties.ValueToJson(value)) is { } error) throw new ArgumentException(error, nameof(key));
+    }
+
     public void AddEmail(string email) => _bridge.AddEmail(email);
 
     public void RemoveEmail(string email) => _bridge.RemoveEmail(email);
@@ -121,7 +126,9 @@ internal sealed class BridgePlatform : IPushizoPlatform
 
     public void RemoveGroupedNotifications(string group) => _bridge.RemoveGroupedNotifications(group);
 
-    public void SetBadgeCount(int count) => _bridge.SetBadgeCount(count);
+    public bool SetBadgeCount(int count) => _bridge.SetBadgeCount(count);
+
+    public int BadgeCount => _bridge.GetBadgeCount();
 
     public void AddTriggers(IReadOnlyDictionary<string, string> triggers) => _bridge.AddTriggers(BridgeJson.ToJson(triggers));
 
@@ -163,8 +170,14 @@ internal sealed class BridgePlatform : IPushizoPlatform
     public Task<string?> ChatCallAsync(string method, string argsJson) =>
         Call(r => _bridge.ChatCall(method, argsJson, r), json => json);
 
-    public void SendEvent(string name, Dictionary<string, object?> properties, double? value) =>
-        _bridge.SendEvent(name, EventProperties.ToJson(properties), value ?? 0d, value.HasValue);
+    public void ChatShow() => _bridge.ChatShow();
+
+    public bool ChatHide() => _bridge.ChatHide();
+
+    public bool ChatIsPresented => _bridge.ChatIsPresented();
+
+    public void SendEvent(string name, Dictionary<string, object?> properties, double? value, string? eventId) =>
+        _bridge.SendEvent(name, EventProperties.ToJson(properties), value ?? 0d, value.HasValue, eventId);
 
     public Task SetupDefaultLiveActivityAsync() =>
         _bridge.SupportsLiveActivities

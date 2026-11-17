@@ -291,6 +291,20 @@ public sealed class ChatManager
     public async Task<string?> GetVisitorIdAsync() =>
         ChatJson.ParseString(Require(await Call("getVisitorId", new JsonObject()).ConfigureAwait(false)), "visitorId");
 
+    /// <summary>
+    /// Yerel SDK'nın hazır sohbet ekranını açar (Android <c>HsChatActivity</c>, iOS modal <c>HSChatViewController</c>); ekran
+    /// zaten açıksa yeniden açılmaz. Herhangi bir iş parçacığından çağrılabilir. Windows ve MacCatalyst hedeflerinde etkisizdir.
+    /// </summary>
+    public void Show() => Pushizo.Platform().ChatShow();
+
+    /// <summary>
+    /// <see cref="Show"/> ile açılan ekranı kapatır; açık ekran varsa true. Yerel SDK'nın olmadığı hedeflerde false.
+    /// </summary>
+    public bool Hide() => Pushizo.Platform().ChatHide();
+
+    /// <summary>Hazır sohbet ekranı şu an açık mı. Başlatılmadan önce ve yerel SDK'nın olmadığı hedeflerde false.</summary>
+    public bool IsPresented => Pushizo.PlatformOrNull()?.ChatIsPresented ?? false;
+
     private static Task<string?> Call(string method, JsonObject args) => Pushizo.Platform().ChatCallAsync(method, args.ToJsonString());
 
     private static string Require(string? json) =>

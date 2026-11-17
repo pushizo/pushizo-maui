@@ -4,7 +4,6 @@ import Pushizo
 #if canImport(PushizoCore)
 import PushizoCore
 #endif
-import CoreLocation
 import UIKit
 import UserNotifications
 
@@ -83,6 +82,10 @@ public final class HSMauiBridge: NSObject {
                 emit("chat", payload)
             }
             Pushizo.Chat.addOpenListener { info in emit("chatOpen", info.dictionary) }
+            // Özellik bayrakları sunucudan yenilendi → `featureFlags` (`{}`); bildirim kutusu değişti → `inbox`
+            // (`{"type":"listed|read|read_all|archived|count","itemId","unreadCount"}`). İkisi de ana iş parçacığında.
+            Pushizo.FeatureFlags.addObserver { emit("featureFlags", [:]) }
+            Pushizo.Inbox.addObserver { event in emit("inbox", event.dictionary) }
             // Yerel SDK izin gözlemcisi → `permission` olayı (`{"permission":bool}`): requestPermission sonrası ve uygulama
             // yeniden etkinleştiğinde (izin Ayarlar'dan değişmiş olabilir) etkin izin değiştiyse çağrılır.
             Pushizo.Notifications.addPermissionObserver { granted in
@@ -124,25 +127,26 @@ public final class HSMauiBridge: NSObject {
         return nil
     }
 
-    /// Profille giriş: `profileJson` `{"email","sms","tags":{},"aliases":{}}` (alanlar isteğe bağlı). Yerel iOS SDK'sında
-    /// profil aşırı yüklemesi olmadığından Android davranışı burada uygulanır: e-posta/telefon girişten ÖNCE doğrulanır
-    /// (geçersizse hata mesajı döner, giriş yapılmaz), sonra giriş, ardından e-posta, SMS, tag ve alias eklenir.
+    /// Profille giriş: `profileJson` `{"email","sms","tags":{},"aliases":{}}` (alanlar isteğe bağlı). Yerel SDK profili ve
+    /// kanıtı girişten ÖNCE doğrular: geçersizse hata mesajı döner ve giriş yapılmaz; başarıda nil (profil işlemleri
+    /// girişten sonra kuyruğa yazılır).
     @objc(loginWithExternalId:profileJson:identityHash:jwt:)
     public static func loginWithProfile(externalId: String, profileJson: String, identityHash: String?, jwt: String?) -> String? {
         let o = (jsonObject(profileJson) as? [String: Any]) ?? [:]
-        let email = o["email"] as? String
-        let sms = o["sms"] as? String
-        if let email = email, HSContacts.normalizeEmail(email) == nil { return "Geçersiz e-posta adresi" }
-        if let sms = sms, HSContacts.normalizePhone(sms) == nil { return "Geçersiz telefon numarası" }
-        if let message = Pushizo.loginProofError(identityHash: identityHash, jwt: jwt) { return message }
-        Pushizo.login(externalId, identityHash: identityHash, jwt: jwt)
-        if let email = email { Pushizo.User.addEmail(email) }
-        if let sms = sms { Pushizo.User.addSms(sms) }
-        let tags = (o["tags"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
-        if !tags.isEmpty { Pushizo.User.addTags(tags) }
-        let aliases = (o["aliases"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
-        if !aliases.isEmpty { Pushizo.User.addAliases(aliases) }
-        return nil
+        let profile = HSUserProfile(
+            email: o["email"] as? String,
+            sms: o["sms"] as? String,
+            tags: (o["tags"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String },
+            aliases: (o["aliases"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+        )
+        do {
+            try Pushizo.login(externalId, profile: profile, identityHash: identityHash, jwt: jwt)
+            return nil
+        } catch HSError.invalidArgument(let message) {
+            return message
+        } catch {
+            return "Pushizo başlatılmadı"
+        }
     }
 
     /// Kimlik JWT'sini yeniler; giriş yapılmamışsa hata mesajı döner, başarıda nil.
@@ -190,6 +194,14 @@ public final class HSMauiBridge: NSObject {
 
     @objc(setLanguage:)
     public static func setLanguage(_ code: String) { Pushizo.User.setLanguage(code) }
+
+    /// Kullanıcı özelliği: `valueJson` `{"value":…}` (metin, sayı, mantıksal, dizi, nesne; `null` özelliği siler). Geçersiz
+    /// girdi yerel SDK'da günlüğe yazılıp yok sayılır.
+    @objc(setUserProperty:valueJson:)
+    public static func setUserProperty(_ key: String, valueJson: String) {
+        let value = (jsonObject(valueJson) as? [String: Any])?["value"]
+        Pushizo.User.setProperty(key, value is NSNull ? nil : value)
+    }
 
     @objc(addEmail:)
     public static func addEmail(_ email: String) { Pushizo.User.addEmail(email) }
@@ -354,6 +366,22 @@ public final class HSMauiBridge: NSObject {
         }
     }
 
+    /// Hazır sohbet ekranını etkin sahnenin en üstteki görünüm denetleyicisinden modal açar (zaten açıksa yeniden açılmaz).
+    @objc(chatShow)
+    public static func chatShow() { Pushizo.Chat.show() }
+
+    /// `chatShow` ile açılan ekranı kapatır; ekran açıktıysa true.
+    @objc(chatHide)
+    public static func chatHide() -> Bool {
+        let presented = chatIsPresented()
+        Pushizo.Chat.hide()
+        return presented
+    }
+
+    /// Hazır sohbet ekranı şu an görünüyor mu (UIKit durumu ana iş parçacığında okunur).
+    @objc(chatIsPresented)
+    public static func chatIsPresented() -> Bool { readOnMain { Pushizo.Chat.isPresented } }
+
     @objc(inboxListWithLimit:cursor:completion:)
     public static func inboxList(limit: Int, cursor: String?, completion: @escaping (String?, String?, String?) -> Void) {
         inbox(completion) {
@@ -467,13 +495,18 @@ public final class HSMauiBridge: NSObject {
     @objc(setBadgeCount:)
     public static func setBadgeCount(_ count: Int) { Pushizo.Notifications.setBadgeCount(max(0, count)) }
 
+    /// Uygulama simgesindeki güncel rozet sayısı (yerel SDK'da okuma karşılığı olmadığından sistemden, ana iş parçacığında okunur).
+    @objc(badgeCount)
+    public static func badgeCount() -> Int { readOnMain { UIApplication.shared.applicationIconBadgeNumber } }
+
     // MARK: Oturum
 
-    /// `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez.
-    @objc(sendEvent:propertiesJson:value:hasValue:)
-    public static func sendEvent(_ name: String, propertiesJson: String, value: Double, hasValue: Bool) {
+    /// `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez. `eventId`
+    /// (isteğe bağlı) tekilleştirme kimliğidir; biçimi geçersizse yerel SDK kendi kimliğini üretir.
+    @objc(sendEvent:propertiesJson:value:hasValue:eventId:)
+    public static func sendEvent(_ name: String, propertiesJson: String, value: Double, hasValue: Bool, eventId: String?) {
         let properties = (jsonObject(propertiesJson) as? [String: Any]) ?? [:]
-        Pushizo.Session.sendEvent(name, properties: properties, value: hasValue ? value : nil)
+        Pushizo.Session.sendEvent(name, properties: properties, value: hasValue ? value : nil, eventId: eventId)
     }
 
     // MARK: Live Activities (ADR-0024)
@@ -517,27 +550,19 @@ public final class HSMauiBridge: NSObject {
         Pushizo.Location.requestPermission(rationale: rationale, completion: completion)
     }
 
-    /// Konum izni verilmiş mi ("kullanırken" veya "her zaman"). Yerel SDK'da karşılığı olmadığından sistem durumundan okunur.
+    /// Konum izni verilmiş mi ("kullanırken" veya "her zaman"); istem göstermez.
     @objc(locationPermissionGranted)
-    public static func locationPermissionGranted() -> Bool {
-        let status = locationAuthorization()
-        return status == .authorizedWhenInUse || status == .authorizedAlways
-    }
+    public static func locationPermissionGranted() -> Bool { Pushizo.Location.permissionGranted }
 
-    /// Arka plan ("her zaman") konum izni verilmiş mi.
+    /// Arka plan ("her zaman") konum izni verilmiş mi; istem göstermez.
     @objc(locationBackgroundPermissionGranted)
-    public static func locationBackgroundPermissionGranted() -> Bool { locationAuthorization() == .authorizedAlways }
+    public static func locationBackgroundPermissionGranted() -> Bool { Pushizo.Location.backgroundPermissionGranted }
 
     /// "Her zaman" konum iznini ister (Android'deki arka plan konum izninin karşılığı); önce "kullanırken" izni verilmiş
     /// olmalıdır. `completion` ana iş parçacığında bir kez çağrılır.
     @objc(requestBackgroundLocationPermissionWithCompletion:)
     public static func requestBackgroundLocationPermission(completion: @escaping (Bool) -> Void) {
         Pushizo.Location.requestAlwaysPermission(completion: completion)
-    }
-
-    private static func locationAuthorization() -> CLAuthorizationStatus {
-        if #available(iOS 14.0, *) { return CLLocationManager().authorizationStatus }
-        return CLLocationManager.authorizationStatus()
     }
 
     /// Arka plan bölge izleme açık mı (kalıcı tercih; ADR-0065, varsayılan kapalı).

@@ -102,18 +102,16 @@ public sealed partial class NativeBridgeSourceContractTests
         var kotlin = Kotlin;
         var swift = Swift;
 
-        // Profille giriş: Android yerel aşırı yüklemeyi çağırır; iOS doğrular, giriş yapar, sonra alanları ekler.
+        // Profille giriş: iki platform da yerel profil aşırı yüklemesini çağırır (doğrulama ve sıra yerel SDK'dadır).
         Assert.Contains("Pushizo.login(externalId, profile, identityHash, jwt)", kotlin);
         Assert.Contains("HsUserProfile(", kotlin);
         var login = swift[swift.IndexOf("func loginWithProfile", StringComparison.Ordinal)..swift.IndexOf("func updateUserJwt", StringComparison.Ordinal)];
-        var validate = login.IndexOf("HSContacts.normalizeEmail(email) == nil", StringComparison.Ordinal);
-        var signIn = login.IndexOf("Pushizo.login(externalId", StringComparison.Ordinal);
-        var addEmail = login.IndexOf("Pushizo.User.addEmail(email)", StringComparison.Ordinal);
-        Assert.True(validate > 0 && validate < signIn && signIn < addEmail);
-        Assert.Contains("HSContacts.normalizePhone(sms) == nil", login);
-        Assert.Contains("Pushizo.User.addSms(sms)", login);
-        Assert.Contains("Pushizo.User.addTags(tags)", login);
-        Assert.Contains("Pushizo.User.addAliases(aliases)", login);
+        Assert.Contains("HSUserProfile(", login);
+        Assert.Contains("try Pushizo.login(externalId, profile: profile, identityHash: identityHash, jwt: jwt)", login);
+        // Yerel hata mesajı köprüden metin olarak döner (C# katmanı NOT_READY'ye çevirir); köprü kendi doğrulamasını yapmaz.
+        Assert.Contains("catch HSError.invalidArgument(let message)", login);
+        Assert.DoesNotContain("HSContacts.", login);
+        Assert.DoesNotContain("Pushizo.User.add", login);
 
         // Reklam rızası ve reklam kimliği (ADR-0037).
         Assert.Contains("Pushizo.User.setAdsPersonalizationConsent(granted, reply<HsPreferencesResult>(result)", kotlin);
@@ -129,9 +127,11 @@ public sealed partial class NativeBridgeSourceContractTests
             Assert.Contains($"\"{field}\": ", swift[swift.IndexOf("private static func consentJson", StringComparison.Ordinal)..]);
         }
 
-        // Rozet: iOS yerel çağrı; Android etkisiz (yerel SDK'da rozet API'si yok).
+        // Rozet: iki platformda da yerel çağrı; Android sonucu (rozet gösterilebiliyor mu) ve saklanan sayıyı döndürür.
         Assert.Contains("Pushizo.Notifications.setBadgeCount(max(0, count))", swift);
-        Assert.DoesNotContain("Pushizo.Notifications.setBadgeCount", kotlin);
+        Assert.Contains("fun setBadgeCount(count: Int): Boolean = Pushizo.Notifications.setBadgeCount(count)", kotlin);
+        Assert.Contains("fun badgeCount(): Int = Pushizo.Notifications.badgeCount", kotlin);
+        Assert.DoesNotContain("Android'de etkisiz", kotlin);
 
         // Konum izin durumu ve arka plan izni.
         Assert.Contains("fun locationPermissionGranted(): Boolean = Pushizo.Location.permissionGranted", kotlin);
@@ -139,8 +139,11 @@ public sealed partial class NativeBridgeSourceContractTests
         Assert.Contains("SdkR.string.hs_geofence_rationale_title", kotlin);
         Assert.Contains("SdkR.string.hs_geofence_rationale_message", kotlin);
         Assert.Contains("if (background) Pushizo.Location.backgroundPermissionGranted else Pushizo.Location.permissionGranted", kotlin);
-        Assert.Contains("status == .authorizedWhenInUse || status == .authorizedAlways", swift);
-        Assert.Contains("locationAuthorization() == .authorizedAlways", swift);
+        // iOS izin durumu yerel API'den okunur; köprüde kendi CLLocationManager uygulaması kalmaz.
+        Assert.Contains("func locationPermissionGranted() -> Bool { Pushizo.Location.permissionGranted }", swift);
+        Assert.Contains("func locationBackgroundPermissionGranted() -> Bool { Pushizo.Location.backgroundPermissionGranted }", swift);
+        Assert.DoesNotContain("CLLocationManager", swift);
+        Assert.DoesNotContain("import CoreLocation", swift);
 
         // ADM yalnızca Android'dedir; sohbet dinleme durumu iki platformda da yerel SDK'dan okunur.
         Assert.Contains("Pushizo.User.registerAdm(token)", kotlin);
@@ -148,6 +151,55 @@ public sealed partial class NativeBridgeSourceContractTests
         Assert.Contains("\"isListening\" -> result.onResult(JSONObject().put(\"listening\", chat.isListening)", kotlin);
         Assert.Contains("case \"isListening\":", swift);
         Assert.Contains("Pushizo.Chat.isListening", swift);
+    }
+
+    [Fact]
+    public void Round_three_apis_reach_native_sdk_on_both_platforms()
+    {
+        var kotlin = Kotlin;
+        var swift = Swift;
+        var android = string.Concat(PlatformSources("Android"));
+        var ios = string.Concat(PlatformSources("iOS"));
+
+        // User.setProperty: değer `{"value":…}` zarfıyla taşınır; Android anahtar hatasını mesaja çevirir.
+        Assert.Contains("Pushizo.User.setProperty(key, toValue(JSONObject(valueJson).opt(\"value\")))", kotlin);
+        var property = kotlin[kotlin.IndexOf("fun setUserProperty", StringComparison.Ordinal)..kotlin.IndexOf("fun addEmail", StringComparison.Ordinal)];
+        Assert.Contains("catch (e: IllegalArgumentException)", property);
+        Assert.Contains("Pushizo.User.setProperty(key, value is NSNull ? nil : value)", swift);
+        Assert.Contains("PushizoMauiBridge.SetUserProperty(key, valueJson)", android);
+        Assert.Contains("HSMauiBridge.SetUserProperty(key, valueJson)", ios);
+
+        // Gözlemciler başlatmada bir kez bağlanır ve olaya çevrilir (push aboneliği gözlemcisiyle aynı kalıp).
+        Assert.Contains("HsFeatureFlagObserver { emit(\"featureFlags\", JSONObject()) }", kotlin);
+        Assert.Contains("Pushizo.FeatureFlags.addObserver(featureFlagObserver)", kotlin);
+        Assert.Contains("HsInboxObserver { event -> emit(\"inbox\", JSONObject(event.toMap())) }", kotlin);
+        Assert.Contains("Pushizo.Inbox.addObserver(inboxObserver)", kotlin);
+        Assert.Contains("Pushizo.FeatureFlags.addObserver { emit(\"featureFlags\", [:]) }", swift);
+        Assert.Contains("Pushizo.Inbox.addObserver { event in emit(\"inbox\", event.dictionary) }", swift);
+        // C# olay türleri köprülerin gönderdiği adlarla aynıdır.
+        Assert.Equal("featureFlags", PushizoSdk.Maui.Internal.BridgeEvents.FeatureFlags);
+        Assert.Equal("inbox", PushizoSdk.Maui.Internal.BridgeEvents.Inbox);
+
+        // Session.sendEvent eventId: kimlik yoksa mevcut yerel çağrı, varsa eventId'li aşırı yükleme.
+        Assert.Contains("if (eventId == null) Pushizo.Session.sendEvent(name, properties, amount)", kotlin);
+        Assert.Contains("else Pushizo.Session.sendEvent(name, properties, amount, eventId)", kotlin);
+        Assert.Contains("Pushizo.Session.sendEvent(name, properties: properties, value: hasValue ? value : nil, eventId: eventId)", swift);
+        Assert.Contains("sendEvent:propertiesJson:value:hasValue:eventId:", ApiDefinition);
+
+        // Hazır sohbet arayüzü: Android etkin Activity (yoksa uygulama bağlamı) ile açar ve açık ekranı yaşam döngüsünden izler.
+        Assert.Contains("Pushizo.Chat.show(context)", kotlin);
+        Assert.Contains("fun chatHide(): Boolean = Pushizo.Chat.hide()", kotlin);
+        Assert.Contains("if (activity is HsChatActivity) chatActivity = WeakReference(activity)", kotlin);
+        Assert.Contains("if (chatActivity?.get() === activity) chatActivity = null", kotlin);
+        Assert.Contains("PushizoMauiBridge.ChatShow(Microsoft.Maui.ApplicationModel.Platform.CurrentActivity)", android);
+        Assert.Contains("func chatShow() { Pushizo.Chat.show() }", swift);
+        Assert.Contains("Pushizo.Chat.hide()", swift);
+        Assert.Contains("func chatIsPresented() -> Bool { readOnMain { Pushizo.Chat.isPresented } }", swift);
+
+        // Rozet okuma: iOS'ta yerel karşılığı olmadığından sistemden okunur.
+        Assert.Contains("UIApplication.shared.applicationIconBadgeNumber", swift);
+        Assert.Contains("PushizoMauiBridge.BadgeCount()", android);
+        Assert.Contains("HSMauiBridge.BadgeCount()", ios);
     }
 
     [Fact]

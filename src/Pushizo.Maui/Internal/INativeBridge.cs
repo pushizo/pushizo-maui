@@ -25,8 +25,9 @@ internal interface INativeBridge
 
     /// <summary>
     /// Profille giriş: <paramref name="profileJson"/> <c>{"email","sms","tags":{},"aliases":{}}</c> (alanlar isteğe bağlı).
-    /// Android'de yerel <c>Pushizo.login(externalId, HsUserProfile, …)</c>; iOS'ta köprü aynı sırayı uygular (doğrula, giriş,
-    /// e-posta/SMS/tag/alias). Geçersiz profil veya kanıtta hata mesajı döner (giriş yapılmaz); başarıda null.
+    /// İki platformda da yerel profil girişi çağrılır (Android <c>Pushizo.login(externalId, HsUserProfile, …)</c>, iOS
+    /// <c>Pushizo.login(_:profile:identityHash:jwt:)</c>): profil ve kanıt girişten önce doğrulanır. Geçersiz profil veya
+    /// kanıtta hata mesajı döner (giriş yapılmaz); başarıda null.
     /// </summary>
     string? LoginWithProfile(string externalId, string profileJson, string? identityHash, string? jwt);
 
@@ -52,6 +53,12 @@ internal interface INativeBridge
     void AddAliases(string aliasesJson);
     void RemoveAlias(string label);
     void SetLanguage(string languageCode);
+
+    /// <summary>
+    /// Kullanıcı özelliği: <paramref name="valueJson"/> <c>{"value":…}</c> (metin, sayı, mantıksal, dizi, nesne; <c>null</c>
+    /// özelliği siler). Yerel SDK anahtarı reddederse hata mesajı (Android), başarıda null (iOS geçersiz girdiyi günlüğe yazar).
+    /// </summary>
+    string? SetUserProperty(string key, string valueJson);
     void AddEmail(string email);
     void RemoveEmail(string email);
     void AddSms(string phoneNumber);
@@ -138,11 +145,20 @@ internal interface INativeBridge
     /// <summary>Mobil reklam kimliği (GAID/IDFA; ADR-0037); null veya sıfır kimlik sunucudaki kaydı siler.</summary>
     void SetAdvertisingId(string? id);
 
-    /// <summary>Uygulama rozetini ayarlar (yalnızca iOS; Android'de etkisiz: rozet görünen bildirimlerden hesaplanır).</summary>
-    void SetBadgeCount(int count);
+    /// <summary>
+    /// Rozet sayısını ayarlar. iOS: uygulama rozeti ve bildirim uzantısıyla paylaşılan sayaç (her zaman true). Android: sayı
+    /// yerel SDK'da saklanır ve sonraki bildirimlere yazılır; rozet bu cihazda gösterilebiliyorsa true.
+    /// </summary>
+    bool SetBadgeCount(int count);
 
-    /// <summary><paramref name="propertiesJson"/> JSON nesnesi; <paramref name="hasValue"/> false ise değer yok sayılır.</summary>
-    void SendEvent(string name, string propertiesJson, double value, bool hasValue);
+    /// <summary>Güncel rozet sayısı (Android: yerel SDK'da saklanan son sayı; iOS: uygulama simgesindeki rozet).</summary>
+    int GetBadgeCount();
+
+    /// <summary>
+    /// <paramref name="propertiesJson"/> JSON nesnesi; <paramref name="hasValue"/> false ise değer yok sayılır.
+    /// <paramref name="eventId"/> isteğe bağlı tekilleştirme kimliğidir (geçersiz biçimde yerel SDK kendi kimliğini üretir).
+    /// </summary>
+    void SendEvent(string name, string propertiesJson, double value, bool hasValue, string? eventId);
 
     /// <summary>
     /// Yerel SDK'da Live Activities var mı (yalnızca iOS). false ise <see cref="BridgePlatform"/> çağrıları köprüye
@@ -248,6 +264,15 @@ internal interface INativeBridge
     /// dönüşsüz işlemlerde null).
     /// </summary>
     void ChatCall(string method, string argsJson, NativeResult result);
+
+    /// <summary>Hazır sohbet ekranını açar (Android <c>HsChatActivity</c>, iOS modal <c>HSChatViewController</c>).</summary>
+    void ChatShow();
+
+    /// <summary>Hazır sohbet ekranını kapatır; açık ekran varsa true.</summary>
+    bool ChatHide();
+
+    /// <summary>Hazır sohbet ekranı şu an açık mı.</summary>
+    bool ChatIsPresented();
 
     /// <summary>Ön plan olayının (<c>foreground</c> olayındaki <c>eventId</c>) yerel gösterimini engeller.</summary>
     void ForegroundPreventDefault(string eventId);

@@ -41,6 +41,8 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public void SetLanguage(string languageCode) => PushizoMauiBridge.SetLanguage(languageCode);
 
+    public string? SetUserProperty(string key, string valueJson) => PushizoMauiBridge.SetUserProperty(key, valueJson);
+
     public void AddEmail(string email) => PushizoMauiBridge.AddEmail(email);
 
     public void RemoveEmail(string email) => PushizoMauiBridge.RemoveEmail(email);
@@ -129,11 +131,13 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public void SetAdvertisingId(string? id) => PushizoMauiBridge.SetAdvertisingId(id);
 
-    /// <summary>Android'de rozet görünen bildirimlerden hesaplanır; Kotlin köprüsü çağrıyı yok sayar.</summary>
-    public void SetBadgeCount(int count) => PushizoMauiBridge.SetBadgeCount(count);
+    /// <summary>Sayı yerel SDK'da saklanır ve sonraki bildirimlere yazılır; rozet bu cihazda gösterilebiliyorsa true.</summary>
+    public bool SetBadgeCount(int count) => PushizoMauiBridge.SetBadgeCount(count);
 
-    public void SendEvent(string name, string propertiesJson, double value, bool hasValue) =>
-        PushizoMauiBridge.SendEvent(name, propertiesJson, value, hasValue);
+    public int GetBadgeCount() => PushizoMauiBridge.BadgeCount();
+
+    public void SendEvent(string name, string propertiesJson, double value, bool hasValue, string? eventId) =>
+        PushizoMauiBridge.SendEvent(name, propertiesJson, value, hasValue, eventId);
 
     /// <summary>Live Activities iOS'a özgüdür; Android'de çağrılar köprüye ulaşmadan <c>PLATFORM_NOT_SUPPORTED</c> olur.</summary>
     public bool SupportsLiveActivities => false;
@@ -207,6 +211,13 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public void ChatCall(string method, string argsJson, NativeResult result) =>
         PushizoMauiBridge.ChatCall(method, argsJson, new ResultCallback(result));
+
+    /// <summary>Etkin Activity varsa onun üzerinden, yoksa uygulama bağlamıyla (yeni görev) açılır.</summary>
+    public void ChatShow() => PushizoMauiBridge.ChatShow(Microsoft.Maui.ApplicationModel.Platform.CurrentActivity);
+
+    public bool ChatHide() => PushizoMauiBridge.ChatHide();
+
+    public bool ChatIsPresented() => PushizoMauiBridge.ChatIsPresented();
 
     public void ForegroundPreventDefault(string eventId) => PushizoMauiBridge.ForegroundPreventDefault(eventId);
 

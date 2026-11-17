@@ -166,6 +166,8 @@ public static class Pushizo
             User.PushSubscription.Reset();
             Notifications.Reset();
             InAppMessages.Reset();
+            Inbox.Reset();
+            FeatureFlags.Reset();
             Chat.Reset();
             Debug.Reset();
             SdkLog.Level = LogLevel.Warn;
@@ -207,5 +209,9 @@ public static class Pushizo
         public void OnChatEvent(ChatEventArgs args) => Chat.Dispatch(args);
 
         public void OnChatOpened(ChatOpenedEventArgs args) => Chat.DispatchOpened(args);
+
+        public void OnFeatureFlagsChanged() => FeatureFlags.DispatchChanged();
+
+        public void OnInboxChanged(InboxChangedEventArgs args) => Inbox.DispatchChanged(args);
     }
 }

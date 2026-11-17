@@ -88,17 +88,32 @@ public sealed class NotificationsManager
     }
 
     /// <summary>
-    /// Uygulama rozetini ayarlar (iOS; bildirim uzantısıyla paylaşılan sayaç da eşitlenir). Android'de rozet görünen
-    /// bildirimlerden hesaplandığından ve diğer hedeflerde etkisizdir. Negatif değerde <see cref="ArgumentOutOfRangeException"/>.
+    /// Rozet sayısını ayarlar. iOS: uygulama rozeti (bildirim uzantısıyla paylaşılan sayaç da eşitlenir). Android: başlatıcı
+    /// rozeti için standart bir API olmadığından sayı yerel SDK'da saklanır ve bundan sonra gösterilen bildirimlere yazılır
+    /// (sayı gösteren başlatıcılar, Android 8+); tepside bildirim yokken rozet görünmez. Diğer hedeflerde etkisizdir. Sonucu
+    /// öğrenmek için <see cref="TrySetBadgeCount"/>. Negatif değerde <see cref="ArgumentOutOfRangeException"/>.
     /// </summary>
-    public void SetBadgeCount(int count)
+    public void SetBadgeCount(int count) => TrySetBadgeCount(count);
+
+    /// <summary>
+    /// <see cref="SetBadgeCount"/> ile aynıdır ve sonucu döndürür: iOS'ta true; Android'de sayı saklandı ve rozet bu cihazda
+    /// gösterilebiliyorsa true (Android 8 öncesinde, bildirimler kapalıyken veya kanal rozeti kapatılmışsa false; sayı yine
+    /// saklanır); Windows ve MacCatalyst hedeflerinde false.
+    /// </summary>
+    public bool TrySetBadgeCount(int count)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(count);
-        Pushizo.Platform().SetBadgeCount(count);
+        return Pushizo.Platform().SetBadgeCount(count);
     }
 
-    /// <summary>Rozeti sıfırlar (iOS; diğer hedeflerde etkisiz).</summary>
+    /// <summary>Rozeti sıfırlar (Android'de saklanan sayı sıfırlanır; tepsideki bildirimler için <see cref="ClearAll"/>).</summary>
     public void ClearBadge() => Pushizo.Platform().SetBadgeCount(0);
+
+    /// <summary>
+    /// Güncel rozet sayısı. Android: <see cref="SetBadgeCount"/> ile saklanan son sayı; iOS: uygulama simgesindeki rozet.
+    /// Başlatılmadan önce ve diğer hedeflerde 0.
+    /// </summary>
+    public int BadgeCount => Pushizo.PlatformOrNull()?.BadgeCount ?? 0;
 
     internal void DispatchClicked(NotificationClickedEventArgs args)
     {
@@ -145,7 +160,7 @@ public sealed class NotificationsManager
 
 /// <summary>
 /// In-app mesajlar (<c>Pushizo.InAppMessages</c>): tetikler yerel SDK'da değerlendirilir (<c>session_start</c>,
-/// <see cref="SessionManager.SendEvent"/> adı, <see cref="SetScreen"/>, <see cref="AddTrigger"/> koşulları);
+/// <see cref="SessionManager.SendEvent(string, IReadOnlyDictionary{string, object}, double?)"/> adı, <see cref="SetScreen"/>, <see cref="AddTrigger"/> koşulları);
 /// mesajlar yerel arayüzle çizilir. Aynı anda tek mesaj gösterilir.
 /// </summary>
 public sealed class InAppMessagesManager
@@ -258,6 +273,18 @@ public sealed class InboxManager
     /// <summary>Okunmamış öğe sayısı.</summary>
     public Task<int> UnreadCountAsync() => Pushizo.Platform().InboxUnreadCountAsync();
 
+    /// <summary>
+    /// Kutu değişti (rozet güncellemek için): <see cref="InboxChangeType.Read"/>, <see cref="InboxChangeType.ReadAll"/> ve
+    /// <see cref="InboxChangeType.Archived"/> her işlemde, <see cref="InboxChangeType.Listed"/> ile
+    /// <see cref="InboxChangeType.Count"/> yalnızca okunmamış sayısı değiştiğinde bildirilir. Yerel SDK'nın ana iş
+    /// parçacığında tetiklenir; aboneliği kaldırmak için <c>-=</c> kullanın. Android ve iOS dışındaki hedeflerde tetiklenmez.
+    /// </summary>
+    public event EventHandler<InboxChangedEventArgs>? Changed;
+
+    internal void DispatchChanged(InboxChangedEventArgs args) => Pushizo.Raise(Changed, args, "Inbox.Changed");
+
+    internal void Reset() => Changed = null;
+
     private static string RequireId(string id) =>
         string.IsNullOrWhiteSpace(id) ? throw new ArgumentException("Öğe kimliği gerekli.", nameof(id)) : id;
 }
@@ -308,7 +335,21 @@ public sealed class SessionManager
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Olay adı gerekli.", nameof(name));
         if (value is { } v && !double.IsFinite(v)) throw new ArgumentException("Olay değeri sonlu bir sayı olmalı.", nameof(value));
         var normalized = EventProperties.Normalize(properties, nameof(properties));
-        Pushizo.Platform().SendEvent(name.Trim(), normalized, value);
+        Pushizo.Platform().SendEvent(name.Trim(), normalized, value, null);
+    }
+
+    /// <summary>
+    /// <c>SendEvent(name, properties, value)</c> ile aynıdır ve olayı
+    /// <paramref name="eventId"/> ile tekilleştirir: aynı kimlik yeniden gönderilirse (ya da reklam pikseli/Conversions API
+    /// aynı kimliği kullanırsa) sunucu olayı bir kez kaydeder. Kimlik 8-64 karakter; harf, rakam ve <c>. _ : -</c>. Boş ya
+    /// da geçersiz biçimde yerel SDK kendi kimliğini üretir (hata fırlatılmaz).
+    /// </summary>
+    public void SendEvent(string name, IReadOnlyDictionary<string, object?>? properties, double? value, string? eventId)
+    {
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("Olay adı gerekli.", nameof(name));
+        if (value is { } v && !double.IsFinite(v)) throw new ArgumentException("Olay değeri sonlu bir sayı olmalı.", nameof(value));
+        var normalized = EventProperties.Normalize(properties, nameof(properties));
+        Pushizo.Platform().SendEvent(name.Trim(), normalized, value, string.IsNullOrWhiteSpace(eventId) ? null : eventId.Trim());
     }
 }
 
@@ -521,6 +562,17 @@ public sealed class FeatureFlagsManager
     internal FeatureFlagsManager()
     {
     }
+
+    /// <summary>
+    /// Bayrak değerleri sunucudan başarıyla yenilendi (oturum başı ve <see cref="RefreshAsync"/>); güncel değerler
+    /// <see cref="IsEnabled"/> / <see cref="GetValue"/> ile okunur. Yerel SDK'nın ana iş parçacığında tetiklenir; aboneliği
+    /// kaldırmak için <c>-=</c> kullanın. Android ve iOS dışındaki hedeflerde tetiklenmez.
+    /// </summary>
+    public event EventHandler<FeatureFlagsChangedEventArgs>? Changed;
+
+    internal void DispatchChanged() => Pushizo.Raise(Changed, new FeatureFlagsChangedEventArgs(), "FeatureFlags.Changed");
+
+    internal void Reset() => Changed = null;
 
     /// <summary>Değerleri hemen yeniler; başarıda true (hata son değerleri korur, false döner).</summary>
     public Task<bool> RefreshAsync() => Pushizo.Platform().RefreshFeatureFlagsAsync();

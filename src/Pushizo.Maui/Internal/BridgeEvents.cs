@@ -13,6 +13,8 @@ namespace PushizoSdk.Maui.Internal;
 /// <item><c>inAppLifecycle</c>: <c>{"event":"willDisplay|didDisplay|willDismiss|didDismiss","messageId","json"}</c></item>
 /// <item><c>chat</c>: <c>{"type":"message|typing|read|unread|conversation|connection|error",…}</c> (canlı sohbet)</item>
 /// <item><c>chatOpen</c>: <c>{"conversationId","seq"}</c> — sohbet bildirimine tıklama</item>
+/// <item><c>featureFlags</c>: <c>{}</c> — özellik bayrakları sunucudan yenilendi</item>
+/// <item><c>inbox</c>: <c>{"type":"listed|read|read_all|archived|count","itemId","unreadCount"}</c> — bildirim kutusu değişti</item>
 /// </list>
 /// Bilinmeyen tür (daha yeni yerel köprü) yok sayılır.
 /// </summary>
@@ -26,6 +28,8 @@ internal static class BridgeEvents
     public const string InAppLifecycle = "inAppLifecycle";
     public const string Chat = "chat";
     public const string ChatOpen = "chatOpen";
+    public const string FeatureFlags = "featureFlags";
+    public const string Inbox = "inbox";
 
     public static void Dispatch(IPushizoEventSink sink, string type, string json, INativeBridge bridge)
     {
@@ -66,6 +70,12 @@ internal static class BridgeEvents
                 break;
             case ChatOpen:
                 sink.OnChatOpened(ChatJson.ParseOpened(json));
+                break;
+            case FeatureFlags:
+                sink.OnFeatureFlagsChanged();
+                break;
+            case Inbox:
+                if (BridgeJson.ParseInboxChange(json) is { } change) sink.OnInboxChanged(change);
                 break;
             default:
                 SdkLog.Write(LogLevel.Debug, $"bilinmeyen yerel olay türü yok sayıldı: {type}");

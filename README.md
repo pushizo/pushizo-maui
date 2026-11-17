@@ -331,7 +331,7 @@ UserPreferences prefs = await Pushizo.User.SetAdsPersonalizationConsentAsync(tru
 IReadOnlyList<UserConsent> consents = await Pushizo.User.GetConsentsAsync(); // Purpose, Granted, Source, UpdatedAt
 Pushizo.Ads.SetAdvertisingId(advertisingId);                                 // null: sunucudaki kayıt silinir
 
-// Rozet (iOS; Android'de etkisiz)
+// Rozet (Android'de sayı saklanır ve sonraki bildirimlere yazılır)
 Pushizo.Notifications.SetBadgeCount(3);
 Pushizo.Notifications.ClearBadge();
 
@@ -339,15 +339,63 @@ Pushizo.User.RegisterAdm(admRegistrationId);          // Fire OS ADM (yalnızca 
 bool listening = await Pushizo.Chat.IsListeningAsync();
 ```
 
-- `Login(externalId, profile, identityHash, jwt)`: Android'de yerel `HsUserProfile` aşırı yüklemesi çağrılır; iOS'ta köprü
-  aynı sırayı uygular (doğrula, giriş, e-posta, SMS, tag, alias). Kimlik kanıtı diğer `Login` ile aynıdır.
+- `Login(externalId, profile, identityHash, jwt)`: iki platformda da yerel SDK'nın profil girişi çağrılır (Android
+  `HsUserProfile`, iOS `HSUserProfile`); profil ve kanıt girişten önce doğrulanır, alanlar girişten sonra yazılır. Kimlik
+  kanıtı diğer `Login` ile aynıdır.
 - `SetAdsPersonalizationConsentAsync` güncel tercihleri döndürür; `false` rızayı geri alır. Reklam kimliği yalnızca bu
   rızası olan kullanıcıda ve SHA-256 özetiyle reklam kitlesine gider (ADR-0037). SDK reklam kitaplığı içermez ve ATT istemi
   göstermez; kimliği uygulama alır (Android `AdvertisingIdClient`, iOS `ASIdentifierManager`).
-- `SetBadgeCount` negatif değerde `ArgumentOutOfRangeException` fırlatır. Android'de rozet görünen bildirimlerden
-  hesaplandığı için çağrı etkisizdir. `RegisterAdm` (Fire OS ADM) iOS'ta etkisizdir.
+- `SetBadgeCount` negatif değerde `ArgumentOutOfRangeException` fırlatır. Android'de başlatıcı rozeti için standart bir
+  API olmadığından sayı yerel SDK'da saklanır ve bundan sonra gösterilen bildirimlere yazılır (sayı gösteren başlatıcılar,
+  Android 8 ve sonrası); tepside bildirim yokken rozet görünmez. `RegisterAdm` (Fire OS ADM) iOS'ta etkisizdir.
 - Windows ve MacCatalyst hedeflerinde bu çağrılar etkisizdir; rıza çağrıları tercihlerle aynı `PLATFORM_NOT_SUPPORTED`
   hatasını verir, `IsListeningAsync` `false` döner.
+
+### Kullanıcı özelliği, gözlemciler, olay kimliği ve hazır sohbet ekranı
+
+```csharp
+// Kullanıcı özelliği: metin, sayı, bool, liste veya sözlük; null özelliği siler
+Pushizo.User.SetProperty("plan", "pro");
+Pushizo.User.SetProperty("ilgi_alanlari", new[] { "spor", "müzik" });
+Pushizo.User.SetProperty("plan", null);
+
+// Gözlemciler: abone olmak için +=, kaldırmak için -=
+Pushizo.FeatureFlags.Changed += (_, _) => ApplyFlags();                    // değerler sunucudan yenilendi
+Pushizo.Inbox.Changed += (_, e) => SetInboxBadge(e.UnreadCount);           // e.Type, e.ItemId, e.UnreadCount
+
+// Olay tekilleştirme kimliği (8-64 karakter; harf, rakam ve . _ : -)
+Pushizo.Session.SendEvent("purchase", new Dictionary<string, object?> { ["sku"] = "A1" }, 129.9, "siparis_2024-0001");
+
+// Rozet sonucu ve güncel sayı
+bool shown = Pushizo.Notifications.TrySetBadgeCount(3);
+int badge = Pushizo.Notifications.BadgeCount;
+
+// Hazır sohbet ekranı
+Pushizo.Chat.Show();
+bool open = Pushizo.Chat.IsPresented;
+bool closed = Pushizo.Chat.Hide();
+```
+
+- `User.SetProperty(key, value)`: anahtar kırpılır; boş ya da 64 karakterden uzun anahtarda ve desteklenmeyen değerde
+  `ArgumentException` fırlatılır. Değer metin, sayı, `bool`, tarih, `Guid`, enum, sözlük veya liste olabilir (en fazla
+  16 seviye); sözlük ve liste içinde `null` olamaz. Çevrimdışıyken yerel kuyrukta bekler.
+- `FeatureFlags.Changed`: bayrak değerleri sunucudan başarıyla yenilendiğinde (oturum başı ve `RefreshAsync`)
+  tetiklenir; güncel değerler `IsEnabled` / `GetValue` ile okunur.
+- `Inbox.Changed`: `InboxChangeType.Read`, `ReadAll` ve `Archived` her işlemde, `Listed` ve `Count` yalnızca okunmamış
+  sayısı değiştiğinde bildirilir. `ItemId` yalnızca `Read` ve `Archived` olaylarında doludur.
+- İki olay da yerel SDK'nın ana iş parçacığında tetiklenir; bir işleyicinin hatası diğerlerini engellemez.
+- `Session.SendEvent(name, properties, value, eventId)`: aynı kimlik yeniden gönderilirse (ya da reklam pikseli /
+  Conversions API aynı kimliği kullanırsa) sunucu olayı bir kez kaydeder. Boş ya da geçersiz biçimli kimlikte yerel SDK
+  kendi kimliğini üretir; hata fırlatılmaz. Üç parametreli `SendEvent` değişmedi.
+- `Notifications.TrySetBadgeCount(count)`, `SetBadgeCount` ile aynı işi yapar ve sonucu döndürür: iOS'ta `true`;
+  Android'de sayı saklandı ve rozet bu cihazda gösterilebiliyorsa `true` (Android 8 öncesinde, bildirimler kapalıyken ya
+  da kanal rozeti kapatılmışsa `false`; sayı yine saklanır). `BadgeCount` Android'de saklanan son sayıyı, iOS'ta
+  uygulama simgesindeki rozeti verir.
+- `Chat.Show()` yerel SDK'nın hazır sohbet ekranını açar (Android `HsChatActivity`, iOS modal `HSChatViewController`);
+  ekran zaten açıksa yeniden açılmaz. `Chat.Hide()` açık ekran varsa `true` döndürür. `Chat.IsPresented` iki platformda
+  da gerçek durumu verir (Android'de köprü ekranı Activity yaşam döngüsünden izler).
+- Windows ve MacCatalyst hedeflerinde `SetProperty`, `SendEvent` ve `Chat.Show` etkisizdir; `TrySetBadgeCount`,
+  `Chat.Hide` ve `Chat.IsPresented` `false`, `BadgeCount` `0` döner; olaylar tetiklenmez.
 
 ### Android teslimat güçlendirme
 
@@ -431,7 +479,8 @@ Yerel SDK'ların Kotlin `object`/lambda/`Result` ve Swift `enum`/async API'leri 
 platformda yalnızca metin (JSON), bool, sayı ve geri çağrı kullanan küçük bir köprü vardır. İki köprü aynı JSON
 biçimlerini üretir; ayrıştırma ve olay yönlendirme platformdan bağımsız katmandadır ve birim testleriyle doğrulanır.
 İzin değişiklikleri yerel SDK izin gözlemcisinden (`addPermissionObserver`) `permission` olayı (`{"permission":bool}`)
-olarak gelir; köprüler ön plana dönüşte kendi izin yoklamasını yapmaz.
+olarak gelir; köprüler ön plana dönüşte kendi izin yoklamasını yapmaz. Özellik bayrağı ve bildirim kutusu gözlemcileri
+de başlatmada bir kez bağlanır ve `featureFlags` (`{}`) ile `inbox` (`{"type","itemId","unreadCount"}`) olaylarına çevrilir.
 
 ## Derleme ve test
 
