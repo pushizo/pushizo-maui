@@ -21,7 +21,7 @@ namespace PushizoSdk.Maui;
 public static class Pushizo
 {
     /// <summary>Bu C# katmanının sürümü.</summary>
-    public const string SdkVersion = "0.2.0";
+    public const string SdkVersion = "0.3.0";
 
     private static readonly object s_gate = new();
     private static IPushizoPlatform s_platform = PlatformFactory.Create();

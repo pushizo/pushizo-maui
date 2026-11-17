@@ -1,13 +1,13 @@
 <Project>
   <!-- Pushizo .NET MAUI SDK: tüm projelerde ortak sürüm ve derleme ayarları. -->
   <PropertyGroup>
-    <PushizoVersion>0.2.0</PushizoVersion>
+    <PushizoVersion>0.3.0</PushizoVersion>
     <!--
       Yerel SDK'ların yayın sürümleri; binding paketleri bu sürümleri sarar (yayın iş akışı pushizo-android / pushizo-ios
       depolarını bu etiketlerden alır: Android "v" önekli, iOS öneksiz).
     -->
-    <PushizoNativeAndroidVersion>0.2.1</PushizoNativeAndroidVersion>
-    <PushizoNativeIosVersion>0.2.0</PushizoNativeIosVersion>
+    <PushizoNativeAndroidVersion>0.3.0</PushizoNativeAndroidVersion>
+    <PushizoNativeIosVersion>0.3.0</PushizoNativeIosVersion>
     <!-- MAUI paket sürümleri hedef .NET sürümüne göre seçilir (MAUI 9 paketleri net8.0 hedeflerini içermez). -->
     <MauiVersion Condition="'$(MauiVersion)' == '' and $(TargetFramework.StartsWith('net8.0'))">8.0.100</MauiVersion>
     <MauiVersion Condition="'$(MauiVersion)' == ''">9.0.120</MauiVersion>

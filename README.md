@@ -19,7 +19,7 @@
 **Install from GitHub until then · O zamana kadar GitHub'dan kurulum:**
 
 ```bash
-git clone --branch v0.2.0 https://github.com/pushizo/pushizo-maui
+git clone --branch v0.3.0 https://github.com/pushizo/pushizo-maui
 dotnet pack pushizo-maui -c Release -o ./packages   # macOS + MAUI iş yükü / workload
 dotnet add package Pushizo.Maui --source ./packages
 ```
@@ -49,7 +49,7 @@ eski sağlayıcı v5 ile uyumlu ve Flutter eklentisiyle aynıdır.
 | `net8.0-ios`, `net9.0-ios` | Yerel iOS SDK'sı (iOS 15+) |
 | Diğerleri (Windows, MacCatalyst) | Çağrılar etkisizdir, bir kez uyarı yazılır; bildirim kutusu ve tercihler `PLATFORM_NOT_SUPPORTED` döndürür; özellik bayrakları koddaki varsayılanı, yerleşimler boş liste verir |
 
-Yerel SDK sürümleri: Android `com.pushizo:pushizo-android` 0.2.1, iOS `Pushizo` 0.2.0 (`Directory.Build.props`).
+Yerel SDK sürümleri: Android `com.pushizo:pushizo-android` 0.3.0, iOS `Pushizo` 0.3.0 (`Directory.Build.props`).
 
 ## Kurulum
 
