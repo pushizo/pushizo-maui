@@ -293,11 +293,13 @@ Pushizo.Location.SetShared(false);               // sunucuya location: null → 
 #### Arka plan bölge izleme
 
 İsteğe bağlıdır ve varsayılan kapalıdır (ADR-0065). İzlemeyi işletim sistemi yapar; sunucuya koordinat gitmez, yalnızca
-bölgeye giriş/çıkış bildirilir. Köprü izin istemez ve manifest/Info.plist'e izin eklemez; üç koşul birlikte gerekir:
+bölgeye giriş/çıkış bildirilir. `SetGeofencingEnabled` izin istemez ve köprü manifest/Info.plist'e izin eklemez; üç koşul
+birlikte gerekir:
 
 ```csharp
 Pushizo.Location.SetShared(true);                 // konum paylaşımı açık
-// Arka plan iznini uygulama ister, ör. MAUI: await Permissions.RequestAsync<Permissions.LocationAlways>();
+// Arka plan ("her zaman") izni: açıklama diyaloğu + sistem istemi; sonuç izin durumudur.
+bool background = await Pushizo.Location.RequestBackgroundPermissionAsync("Mağazaya vardığınızda haber vermek için.");
 Pushizo.Location.SetGeofencingEnabled(true);      // tercih kalıcıdır; false kayıtlı bölgeleri kaldırır
 bool on = Pushizo.Location.IsGeofencingEnabled;
 ```
@@ -305,8 +307,47 @@ bool on = Pushizo.Location.IsGeofencingEnabled;
 - iOS: `Info.plist` içine `NSLocationAlwaysAndWhenInUseUsageDescription` ekleyin; "her zaman" izni verilmiş olmalıdır.
 - Android: manifest'e `ACCESS_BACKGROUND_LOCATION` ekleyin ve uygulamaya `Xamarin.GooglePlayServices.Location` paketini
   (`play-services-location`) ekleyin; yerel SDK bu bağımlılığı kendisi getirmez.
+- `RequestBackgroundPermissionAsync(rationale)` ve `RequestAlwaysPermissionAsync()` aynı izni ister (Android
+  `ACCESS_BACKGROUND_LOCATION`; Android 11 ve sonrasında Ayarlar ekranı açılır, manifest'te izin yoksa `false`. iOS "her
+  zaman" izni; açıklama metni kullanılmaz). Önce `RequestPermissionAsync` ile ön plan izni verilmiş olmalıdır. Durum
+  `Pushizo.Location.PermissionGranted` ve `BackgroundPermissionGranted` ile okunur.
 - `SetShared(false)`, `SetGeofencingEnabled(false)` ve gizlilik onayının geri alınması kayıtlı bölgeleri kaldırır.
   Windows ve MacCatalyst'te etkisizdir (`IsGeofencingEnabled` false).
+
+### Profille giriş, reklam rızası, reklam kimliği ve rozet
+
+```csharp
+// Profille giriş: e-posta, SMS, tag ve alias tek çağrıda; geçersiz alanda ArgumentException fırlatılır, giriş yapılmaz.
+Pushizo.Login("user_42", new PushizoUserProfile
+{
+    Email = "ali@ornek.com",
+    Sms = "+905321234567",
+    Tags = new Dictionary<string, string> { ["plan"] = "pro" },
+    Aliases = new Dictionary<string, string> { ["crm_id"] = "42" },
+}, jwt: token);
+
+// Reklam kişiselleştirme rızası ve reklam kimliği (GAID / IDFA; kimliği uygulama alır)
+UserPreferences prefs = await Pushizo.User.SetAdsPersonalizationConsentAsync(true);
+IReadOnlyList<UserConsent> consents = await Pushizo.User.GetConsentsAsync(); // Purpose, Granted, Source, UpdatedAt
+Pushizo.Ads.SetAdvertisingId(advertisingId);                                 // null: sunucudaki kayıt silinir
+
+// Rozet (iOS; Android'de etkisiz)
+Pushizo.Notifications.SetBadgeCount(3);
+Pushizo.Notifications.ClearBadge();
+
+Pushizo.User.RegisterAdm(admRegistrationId);          // Fire OS ADM (yalnızca Android)
+bool listening = await Pushizo.Chat.IsListeningAsync();
+```
+
+- `Login(externalId, profile, identityHash, jwt)`: Android'de yerel `HsUserProfile` aşırı yüklemesi çağrılır; iOS'ta köprü
+  aynı sırayı uygular (doğrula, giriş, e-posta, SMS, tag, alias). Kimlik kanıtı diğer `Login` ile aynıdır.
+- `SetAdsPersonalizationConsentAsync` güncel tercihleri döndürür; `false` rızayı geri alır. Reklam kimliği yalnızca bu
+  rızası olan kullanıcıda ve SHA-256 özetiyle reklam kitlesine gider (ADR-0037). SDK reklam kitaplığı içermez ve ATT istemi
+  göstermez; kimliği uygulama alır (Android `AdvertisingIdClient`, iOS `ASIdentifierManager`).
+- `SetBadgeCount` negatif değerde `ArgumentOutOfRangeException` fırlatır. Android'de rozet görünen bildirimlerden
+  hesaplandığı için çağrı etkisizdir. `RegisterAdm` (Fire OS ADM) iOS'ta etkisizdir.
+- Windows ve MacCatalyst hedeflerinde bu çağrılar etkisizdir; rıza çağrıları tercihlerle aynı `PLATFORM_NOT_SUPPORTED`
+  hatasını verir, `IsListeningAsync` `false` döner.
 
 ### Android teslimat güçlendirme
 

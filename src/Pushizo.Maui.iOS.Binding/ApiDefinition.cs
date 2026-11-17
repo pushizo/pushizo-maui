@@ -42,6 +42,11 @@ namespace PushizoSdk.Native.iOS
         string Login (string externalId, [NullAllowed] string identityHash, [NullAllowed] string jwt);
 
         [Static]
+        [Export ("loginWithExternalId:profileJson:identityHash:jwt:")]
+        [return: NullAllowed]
+        string LoginWithProfile (string externalId, string profileJson, [NullAllowed] string identityHash, [NullAllowed] string jwt);
+
+        [Static]
         [Export ("updateUserJwt:")]
         [return: NullAllowed]
         string UpdateUserJwt (string jwt);
@@ -213,6 +218,22 @@ namespace PushizoSdk.Native.iOS
         void SetPreferences (string preferencesJson, HSMauiResultHandler completion);
 
         [Static]
+        [Export ("setAdsPersonalizationConsent:completion:")]
+        void SetAdsPersonalizationConsent (bool granted, HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("getConsentsWithCompletion:")]
+        void GetConsents (HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("setAdvertisingId:")]
+        void SetAdvertisingId ([NullAllowed] string id);
+
+        [Static]
+        [Export ("setBadgeCount:")]
+        void SetBadgeCount (nint count);
+
+        [Static]
         [Export ("sendEvent:propertiesJson:value:hasValue:")]
         void SendEvent (string name, string propertiesJson, double value, bool hasValue);
 
@@ -235,6 +256,18 @@ namespace PushizoSdk.Native.iOS
         [Static]
         [Export ("requestLocationPermissionWithRationale:completion:")]
         void RequestLocationPermission ([NullAllowed] string rationale, HSMauiPermissionHandler completion);
+
+        [Static]
+        [Export ("locationPermissionGranted")]
+        bool LocationPermissionGranted ();
+
+        [Static]
+        [Export ("locationBackgroundPermissionGranted")]
+        bool LocationBackgroundPermissionGranted ();
+
+        [Static]
+        [Export ("requestBackgroundLocationPermissionWithCompletion:")]
+        void RequestBackgroundLocationPermission (HSMauiPermissionHandler completion);
 
         [Static]
         [Export ("geofencingEnabled")]

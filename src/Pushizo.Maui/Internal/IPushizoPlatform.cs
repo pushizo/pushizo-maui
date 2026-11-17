@@ -12,6 +12,9 @@ internal interface IPushizoPlatform
     void Initialize(string appId, PushizoOptions options, IPushizoEventSink sink);
     void SetConsentGiven(bool given);
     void Login(string externalId, string? identityHash, string? jwt);
+
+    /// <summary>Profille giriş; profil alanları doğrulanmış ve normalize edilmiştir.</summary>
+    void Login(string externalId, PushizoUserProfile profile, string? identityHash, string? jwt);
     void UpdateUserJwt(string jwt);
     void Logout();
     void SetLogLevel(LogLevel level);
@@ -34,6 +37,14 @@ internal interface IPushizoPlatform
     Task<UserPreferences> GetPreferencesAsync();
     Task<UserPreferences> SetPreferencesAsync(IReadOnlyList<PreferenceInput> preferences);
 
+    /// <summary>Fire OS ADM kayıt kimliği (yalnızca Android; diğer hedeflerde etkisiz).</summary>
+    void RegisterAdm(string token);
+
+    // Reklam rızası ve reklam kimliği (ADR-0037)
+    Task<UserPreferences> SetAdsPersonalizationConsentAsync(bool granted);
+    Task<IReadOnlyList<UserConsent>> GetConsentsAsync();
+    void SetAdvertisingId(string? id);
+
     // Push aboneliği
     PushSubscriptionState PushSubscription { get; }
     void OptIn();
@@ -45,6 +56,9 @@ internal interface IPushizoPlatform
     void ClearAllNotifications();
     void RemoveNotification(string id);
     void RemoveGroupedNotifications(string group);
+
+    /// <summary>Uygulama rozeti (yalnızca iOS; diğer hedeflerde etkisiz). Sayı negatif değildir.</summary>
+    void SetBadgeCount(int count);
 
     // In-app
     void AddTriggers(IReadOnlyDictionary<string, string> triggers);
@@ -79,6 +93,12 @@ internal interface IPushizoPlatform
 
     /// <summary><paramref name="rationale"/> boş değilse kırpılmıştır; null ise yerel SDK'nın varsayılan metni kullanılır.</summary>
     Task<bool> RequestLocationPermissionAsync(string? rationale);
+
+    bool LocationPermissionGranted { get; }
+    bool LocationBackgroundPermissionGranted { get; }
+
+    /// <summary>Arka plan ("her zaman") konum izni; <paramref name="rationale"/> yalnızca Android'de kullanılır.</summary>
+    Task<bool> RequestBackgroundLocationPermissionAsync(string? rationale);
 
     // Arka plan bölge izleme (ADR-0065; varsayılan kapalı, izinler uygulamanındır)
     bool GeofencingEnabled { get; }

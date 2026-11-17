@@ -23,6 +23,7 @@ import com.pushizo.sdk.HsInAppClickEvent
 import com.pushizo.sdk.HsInAppMessage
 import com.pushizo.sdk.HsInAppLifecycleEvent
 import com.pushizo.sdk.HsInAppLifecycleListener
+import com.pushizo.sdk.HsConsent
 import com.pushizo.sdk.HsContentCard
 import com.pushizo.sdk.HsContentCardFeed
 import com.pushizo.sdk.HsDeliverySetting
@@ -36,6 +37,7 @@ import com.pushizo.sdk.HsPreference
 import com.pushizo.sdk.HsPreferenceInput
 import com.pushizo.sdk.HsPreferencesResult
 import com.pushizo.sdk.HsPushSubscriptionState
+import com.pushizo.sdk.HsUserProfile
 import com.pushizo.sdk.R as SdkR
 import org.json.JSONArray
 import org.json.JSONObject
@@ -96,6 +98,9 @@ object PushizoMauiBridge {
 
     /** Sistem konum izni istendi; sonuç `onRequestPermissionsResult` ya da ön plana dönüşle bekleniyor. */
     private var locationAwaitingResult = false
+
+    /** Etkin istek arka plan konum izni için mi (sonuç `backgroundPermissionGranted` ile okunur). */
+    private var locationRequestBackground = false
 
     private val clickListener: (HsClickEvent) -> Unit = { e ->
         emit("click", JSONObject().put("notification", notificationJson(e.notification)).put("actionId", e.actionId ?: JSONObject.NULL).put("url", e.url ?: JSONObject.NULL))
@@ -200,6 +205,22 @@ object PushizoMauiBridge {
         Pushizo.login(externalId, identityHash, jwt)
     }
 
+    /**
+     * Profille giriş: `profileJson` `{"email","sms","tags":{},"aliases":{}}` (alanlar isteğe bağlı). Yerel SDK profili
+     * girişten önce doğrular; geçersiz profil veya kanıtta hata mesajı döner (giriş yapılmaz), başarıda null.
+     */
+    @JvmStatic
+    fun loginWithProfile(externalId: String, profileJson: String, identityHash: String?, jwt: String?): String? = identityError {
+        val o = try { JSONObject(profileJson) } catch (e: org.json.JSONException) { throw IllegalArgumentException("Geçersiz profil", e) }
+        val profile = HsUserProfile(
+            email = if (o.isNull("email")) null else o.getString("email"),
+            sms = if (o.isNull("sms")) null else o.getString("sms"),
+            tags = o.optJSONObject("tags")?.let(::stringMap).orEmpty(),
+            aliases = o.optJSONObject("aliases")?.let(::stringMap).orEmpty(),
+        )
+        Pushizo.login(externalId, profile, identityHash, jwt)
+    }
+
     /** Kimlik JWT'sini yeniler; giriş yapılmamışsa hata mesajı döner, başarıda null. */
     @JvmStatic fun updateUserJwt(jwt: String): String? = identityError { Pushizo.updateUserJwt(jwt) }
 
@@ -241,6 +262,14 @@ object PushizoMauiBridge {
     @JvmStatic fun addSms(phoneNumber: String) = Pushizo.User.addSms(phoneNumber)
 
     @JvmStatic fun removeSms(phoneNumber: String) = Pushizo.User.removeSms(phoneNumber)
+
+    /** Fire OS ADM kayıt kimliği; geçersiz kimlikte hata mesajı döner (Java istisnası köprüden sızmaz), başarıda null. */
+    @JvmStatic fun registerAdm(token: String): String? = try {
+        Pushizo.User.registerAdm(token)
+        null
+    } catch (e: IllegalArgumentException) {
+        e.message ?: "Geçersiz ADM kayıt kimliği"
+    }
 
     @JvmStatic fun emails(): String = JSONArray(Pushizo.User.emails).toString()
 
@@ -401,8 +430,9 @@ object PushizoMauiBridge {
     /**
      * Sohbet çağrıları tek giriş noktasından (binding yüzeyi küçük kalsın diye). `method`: start, getConfig, getConversation,
      * getMessages, sendMessage, sendAttachment (base64), markRead, refreshUnreadCount, getUnreadCount, leaveOfflineMessage,
-     * setTyping, startListening, stopListening, attachmentUrl, getVisitorId. Başarı JSON'u modelin camelCase sözlüğü;
-     * sayaçlar `{"unreadCount":n}`, adres `{"url"}`, kimlik `{"visitorId"}`, dönüşsüz işlemler null.
+     * setTyping, startListening, stopListening, isListening, attachmentUrl, getVisitorId. Başarı JSON'u modelin camelCase
+     * sözlüğü; sayaçlar `{"unreadCount":n}`, adres `{"url"}`, kimlik `{"visitorId"}`, dinleme `{"listening"}`, dönüşsüz
+     * işlemler null.
      */
     @JvmStatic
     fun chatCall(method: String, argsJson: String, result: PushizoMauiResult) {
@@ -429,6 +459,7 @@ object PushizoMauiBridge {
                 "setTyping" -> { chat.setTyping(a.optBoolean("typing", false)); result.onResult(null, null, null) }
                 "startListening" -> { chat.startListening(); result.onResult(null, null, null) }
                 "stopListening" -> { chat.stopListening(); result.onResult(null, null, null) }
+                "isListening" -> result.onResult(JSONObject().put("listening", chat.isListening).toString(), null, null)
                 "attachmentUrl" -> result.onResult(JSONObject().put("url", chat.attachmentUrl(required("attachmentId"), a.optBoolean("download", false))).toString(), null, null)
                 "getVisitorId" -> result.onResult(JSONObject().put("visitorId", chat.visitorId ?: JSONObject.NULL).toString(), null, null)
                 else -> result.onResult(null, "INVALID_ARGUMENT", "bilinmeyen sohbet yöntemi: $method")
@@ -456,6 +487,30 @@ object PushizoMauiBridge {
             return
         }
         Pushizo.User.setPreferences(inputs, reply<HsPreferencesResult>(result) { preferencesResultJson(it).toString() })
+    }
+
+    // --- Reklam rızası ve reklam kimliği (ADR-0037) ---
+
+    /** Reklam kişiselleştirme rızasını yazar; başarı JSON'u `getPreferences` ile aynıdır (güncel liste). */
+    @JvmStatic
+    fun setAdsPersonalizationConsent(granted: Boolean, result: PushizoMauiResult) =
+        Pushizo.User.setAdsPersonalizationConsent(granted, reply<HsPreferencesResult>(result) { preferencesResultJson(it).toString() })
+
+    /** Başarı JSON'u: `{"consents":[{"purpose","granted","source","updatedAt"}]}` (zaman epoch ms). */
+    @JvmStatic
+    fun getConsents(result: PushizoMauiResult) =
+        Pushizo.User.getConsents(reply<List<HsConsent>>(result) { consents ->
+            val list = JSONArray()
+            consents.forEach { list.put(consentJson(it)) }
+            JSONObject().put("consents", list).toString()
+        })
+
+    /** Reklam kimliği (GAID); null veya sıfır kimlik sunucudaki kaydı siler. */
+    @JvmStatic fun setAdvertisingId(id: String?) = Pushizo.Ads.setAdvertisingId(id)
+
+    /** Android'de rozet görünen bildirimlerden hesaplanır; çağrı etkisizdir (iOS ile ortak yüzey için vardır). */
+    @JvmStatic fun setBadgeCount(count: Int) {
+        HsLog.d("setBadgeCount($count): Android'de etkisiz (rozet görünen bildirimlerden hesaplanır)")
     }
 
     /** `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez. */
@@ -496,16 +551,83 @@ object PushizoMauiBridge {
             callback.onResult(false)
             return
         }
-        synchronized(locationLock) {
-            locationCallbacks.add(callback)
-            if (locationRequestActive) return
-            locationRequestActive = true
+        val busy = synchronized(locationLock) {
+            if (locationRequestActive && locationRequestBackground) {
+                true
+            } else {
+                locationCallbacks.add(callback)
+                if (locationRequestActive) return
+                locationRequestActive = true
+                locationRequestBackground = false
+                false
+            }
         }
-        activity.runOnUiThread { showLocationRationale(activity, rationale, permissions) }
+        if (busy) {
+            // Arka plan izni istemi açıkken ikinci diyalog açılmaz; güncel durum döner.
+            callback.onResult(Pushizo.Location.permissionGranted)
+            return
+        }
+        activity.runOnUiThread { showLocationRationale(activity, rationale, permissions, background = false) }
+    }
+
+    /** Yaklaşık veya hassas konum izni verilmiş mi. */
+    @JvmStatic fun locationPermissionGranted(): Boolean = Pushizo.Location.permissionGranted
+
+    /** Arka plan konum izni verilmiş mi (Android 10 öncesinde hassas konum izni yeterlidir). */
+    @JvmStatic fun locationBackgroundPermissionGranted(): Boolean = Pushizo.Location.backgroundPermissionGranted
+
+    /**
+     * Arka plan konum iznini ister ve sonucu `callback` ile bildirir (yerel `Location.requestBackgroundPermission` sonuç
+     * döndürmediği için akış burada kurulur, davranış aynıdır): izin varsa hemen true; Android 10 öncesinde normal konum
+     * izni akışı; manifest'te `ACCESS_BACKGROUND_LOCATION` ya da etkin Activity yoksa false; aksi halde SDK metinleriyle
+     * açıklama diyaloğu, "Devam" ile sistem istemi (Android 11+ Ayarlar ekranı). Sonuç `onRequestPermissionsResult` ya da
+     * etkinliğin ön plana dönüşüyle gelir; `Pushizo.Location.onPermissionResult()` çağrılır.
+     */
+    @JvmStatic
+    fun requestBackgroundLocationPermission(activity: Activity?, rationale: String?, callback: PushizoMauiPermissionCallback) {
+        if (Pushizo.Location.backgroundPermissionGranted) {
+            Pushizo.Location.onPermissionResult()
+            callback.onResult(true)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            requestLocationPermission(activity, rationale, callback)
+            return
+        }
+        val declared = (activity ?: appContext)?.let(::declaredPermissions).orEmpty()
+        if (Manifest.permission.ACCESS_BACKGROUND_LOCATION !in declared) {
+            HsLog.w("arka plan konum izni istenemedi: uygulama manifest'inde ACCESS_BACKGROUND_LOCATION yok")
+            callback.onResult(false)
+            return
+        }
+        if (activity == null) {
+            HsLog.w("arka plan konum izni istenemedi: etkin Activity yok")
+            callback.onResult(false)
+            return
+        }
+        val busy = synchronized(locationLock) {
+            if (locationRequestActive && !locationRequestBackground) {
+                true
+            } else {
+                locationCallbacks.add(callback)
+                if (locationRequestActive) return
+                locationRequestActive = true
+                locationRequestBackground = true
+                false
+            }
+        }
+        if (busy) {
+            // Ön plan konum izni istemi açıkken ikinci diyalog açılmaz; güncel durum (verilmedi) döner.
+            callback.onResult(false)
+            return
+        }
+        activity.runOnUiThread {
+            showLocationRationale(activity, rationale, listOf(Manifest.permission.ACCESS_BACKGROUND_LOCATION), background = true)
+        }
     }
 
     /** Açıklama diyaloğu (UI iş parçacığında); "Şimdi değil", geri tuşu ya da dışarı dokunma false ile sonuçlanır. */
-    private fun showLocationRationale(activity: Activity, rationale: String?, permissions: List<String>) {
+    private fun showLocationRationale(activity: Activity, rationale: String?, permissions: List<String>, background: Boolean) {
         if (activity.isFinishing || activity.isDestroyed) {
             finishLocationRequest(false)
             return
@@ -513,8 +635,11 @@ object PushizoMauiBridge {
         var proceed = false
         try {
             AlertDialog.Builder(activity)
-                .setTitle(SdkR.string.hs_location_rationale_title)
-                .setMessage(rationale?.takeIf { it.isNotBlank() } ?: activity.getString(SdkR.string.hs_location_rationale_message))
+                .setTitle(if (background) SdkR.string.hs_geofence_rationale_title else SdkR.string.hs_location_rationale_title)
+                .setMessage(
+                    rationale?.takeIf { it.isNotBlank() }
+                        ?: activity.getString(if (background) SdkR.string.hs_geofence_rationale_message else SdkR.string.hs_location_rationale_message),
+                )
                 .setPositiveButton(SdkR.string.hs_location_rationale_continue) { _, _ -> proceed = true }
                 .setNegativeButton(SdkR.string.hs_location_rationale_not_now, null)
                 .setOnDismissListener {
@@ -539,13 +664,15 @@ object PushizoMauiBridge {
     /** Sistem istemi sonucunu bekleyenlere iletir (istem açık değilse etkisiz). */
     private fun resolveLocationRequest() {
         val callbacks: List<PushizoMauiPermissionCallback>
+        val background: Boolean
         synchronized(locationLock) {
             if (!locationAwaitingResult) return
+            background = locationRequestBackground
             callbacks = takeLocationCallbacks()
         }
-        // İzin verildiyse ve paylaşım açıksa yerel SDK konumu hemen gönderir.
+        // İzin verildiyse ve paylaşım açıksa yerel SDK konumu hemen gönderir (bölge izleme açıksa bölgeler yenilenir).
         Pushizo.Location.onPermissionResult()
-        val granted = Pushizo.Location.permissionGranted
+        val granted = if (background) Pushizo.Location.backgroundPermissionGranted else Pushizo.Location.permissionGranted
         callbacks.forEach { runCatching { it.onResult(granted) } }
     }
 
@@ -558,18 +685,24 @@ object PushizoMauiBridge {
     private fun takeLocationCallbacks(): List<PushizoMauiPermissionCallback> {
         locationRequestActive = false
         locationAwaitingResult = false
+        locationRequestBackground = false
         val callbacks = locationCallbacks.toList()
         locationCallbacks.clear()
         return callbacks
     }
 
     /** Uygulama manifest'inde tanımlı konum izinleri (yalnızca bunlar istenebilir; köprü izin eklemez). */
+    private fun declaredLocationPermissions(context: Context): List<String> {
+        val requested = declaredPermissions(context)
+        return locationPermissions.filter { it in requested }
+    }
+
+    /** Uygulama manifest'inde tanımlı tüm izinler. */
     @Suppress("DEPRECATION")
-    private fun declaredLocationPermissions(context: Context): List<String> = runCatching {
+    private fun declaredPermissions(context: Context): Set<String> = runCatching {
         val info = context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
-        val requested = info.requestedPermissions?.toSet().orEmpty()
-        locationPermissions.filter { it in requested }
-    }.getOrDefault(emptyList())
+        info.requestedPermissions?.toSet().orEmpty()
+    }.getOrDefault(emptySet())
 
     /** Arka plan bölge izleme açık mı (kalıcı tercih; ADR-0065, varsayılan kapalı). */
     @JvmStatic fun geofencingEnabled(): Boolean = Pushizo.Location.isGeofencingEnabled
@@ -798,6 +931,12 @@ object PushizoMauiBridge {
         .put("explicit", p.explicit)
         .put("source", nullable(p.source))
         .put("updatedAt", nullable(p.updatedAt))
+
+    private fun consentJson(c: HsConsent): JSONObject = JSONObject()
+        .put("purpose", c.purpose)
+        .put("granted", c.granted)
+        .put("source", nullable(c.source))
+        .put("updatedAt", nullable(c.updatedAt))
 
     private fun categoryJson(c: HsMessageCategory): JSONObject = JSONObject()
         .put("key", c.key)

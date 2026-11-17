@@ -77,6 +77,31 @@ internal sealed class FakeNativeBridge : INativeBridge
         return LoginError;
     }
 
+    public string? LoginWithProfile(string externalId, string profileJson, string? identityHash, string? jwt)
+    {
+        Record($"loginWithProfile:{externalId}:{profileJson}:{identityHash ?? "<null>"}:{jwt ?? "<null>"}");
+        return LoginError;
+    }
+
+    /// <summary>RegisterAdm yanıtı (yerel SDK'nın geçersiz kimlik hatası; null = başarı).</summary>
+    public string? RegisterAdmError { get; set; }
+
+    public string? RegisterAdm(string token)
+    {
+        Record($"registerAdm:{token}");
+        return RegisterAdmError;
+    }
+
+    /// <summary>Rıza yanıtı: (json, hata kodu, hata mesajı).</summary>
+    public (string? Json, string? Code, string? Message) ConsentsResponse { get; set; } = ("""{"consents":[]}""", null, null);
+
+    public void SetAdsPersonalizationConsent(bool granted, NativeResult result) =>
+        Respond($"setAdsPersonalizationConsent:{granted}", PreferencesResponse, result);
+
+    public void GetConsents(NativeResult result) => Respond("getConsents", ConsentsResponse, result);
+    public void SetAdvertisingId(string? id) => Record($"advertisingId:{id ?? "<null>"}");
+    public void SetBadgeCount(int count) => Record($"badge:{count}");
+
     public string? UpdateUserJwt(string jwt)
     {
         Record($"updateUserJwt:{jwt}");
@@ -184,6 +209,22 @@ internal sealed class FakeNativeBridge : INativeBridge
         LastLocationRationale = rationale;
         // Gerçek köprüler sonucu başka bir iş parçacığından (iOS: ana, Android: UI/yaşam döngüsü) döndürür.
         ThreadPool.QueueUserWorkItem(_ => completion(LocationPermissionResult));
+    }
+
+    public bool LocationPermissionGrantedValue { get; set; }
+    public bool LocationBackgroundPermissionGrantedValue { get; set; }
+
+    /// <summary>Arka plan konum izni isteğinin sonucu.</summary>
+    public bool BackgroundLocationPermissionResult { get; set; } = true;
+
+    public bool GetLocationPermissionGranted() => LocationPermissionGrantedValue;
+    public bool GetLocationBackgroundPermissionGranted() => LocationBackgroundPermissionGrantedValue;
+
+    public void RequestBackgroundLocationPermission(string? rationale, Action<bool> completion)
+    {
+        Record("requestBackgroundLocationPermission");
+        LastLocationRationale = rationale;
+        ThreadPool.QueueUserWorkItem(_ => completion(BackgroundLocationPermissionResult));
     }
 
     /// <summary>Yerel SDK'daki kalıcı bölge izleme tercihi.</summary>

@@ -87,6 +87,19 @@ public sealed class NotificationsManager
         Pushizo.Platform().RemoveGroupedNotifications(group);
     }
 
+    /// <summary>
+    /// Uygulama rozetini ayarlar (iOS; bildirim uzantısıyla paylaşılan sayaç da eşitlenir). Android'de rozet görünen
+    /// bildirimlerden hesaplandığından ve diğer hedeflerde etkisizdir. Negatif değerde <see cref="ArgumentOutOfRangeException"/>.
+    /// </summary>
+    public void SetBadgeCount(int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        Pushizo.Platform().SetBadgeCount(count);
+    }
+
+    /// <summary>Rozeti sıfırlar (iOS; diğer hedeflerde etkisiz).</summary>
+    public void ClearBadge() => Pushizo.Platform().SetBadgeCount(0);
+
     internal void DispatchClicked(NotificationClickedEventArgs args)
     {
         EventHandler<NotificationClickedEventArgs>? handler;
@@ -388,6 +401,30 @@ public sealed class LocationManager
     public Task<bool> RequestPermissionAsync(string? rationale = null) =>
         Pushizo.Platform().RequestLocationPermissionAsync(string.IsNullOrWhiteSpace(rationale) ? null : rationale.Trim());
 
+    /// <summary>Konum izni (yaklaşık/hassas; iOS'ta "kullanırken" veya "her zaman") verilmiş mi. Başlatılmadan önce false.</summary>
+    public bool PermissionGranted => Pushizo.PlatformOrNull()?.LocationPermissionGranted ?? false;
+
+    /// <summary>
+    /// Arka plan konum izni (Android <c>ACCESS_BACKGROUND_LOCATION</c>, iOS "her zaman") verilmiş mi. Başlatılmadan önce false.
+    /// </summary>
+    public bool BackgroundPermissionGranted => Pushizo.PlatformOrNull()?.LocationBackgroundPermissionGranted ?? false;
+
+    /// <summary>
+    /// Arka plan konum iznini ister (bölge izleme için); önce <see cref="RequestPermissionAsync"/> ile ön plan izni verilmiş
+    /// olmalıdır. Android: açıklama diyaloğu (<paramref name="rationale"/>; boşsa SDK'nın yerelleştirilmiş metni), ardından
+    /// sistem istemi (Android 11+ Ayarlar ekranı); manifest'te <c>ACCESS_BACKGROUND_LOCATION</c> yoksa false. iOS: "her zaman"
+    /// izni istenir (<paramref name="rationale"/> yok sayılır; <c>NSLocationAlwaysAndWhenInUseUsageDescription</c> gerekir).
+    /// Sonuç: izin var/verildi ise true. Windows ve MacCatalyst hedeflerinde false.
+    /// </summary>
+    public Task<bool> RequestBackgroundPermissionAsync(string? rationale = null) =>
+        Pushizo.Platform().RequestBackgroundLocationPermissionAsync(string.IsNullOrWhiteSpace(rationale) ? null : rationale.Trim());
+
+    /// <summary>
+    /// "Her zaman" konum iznini ister: <see cref="RequestBackgroundPermissionAsync"/> ile aynı kavramdır (iOS adı);
+    /// Android'de arka plan konum izni akışına gider.
+    /// </summary>
+    public Task<bool> RequestAlwaysPermissionAsync() => Pushizo.Platform().RequestBackgroundLocationPermissionAsync(null);
+
     /// <summary>Arka plan bölge izleme açık mı (kalıcı tercih; varsayılan kapalı). Başlatılmadan önce false.</summary>
     public bool IsGeofencingEnabled => Pushizo.PlatformOrNull()?.GeofencingEnabled ?? false;
 
@@ -395,7 +432,8 @@ public sealed class LocationManager
     /// Arka plan bölge izlemeyi açar/kapatır (ADR-0065). İzlemeyi işletim sistemi yapar; sunucuya koordinat gitmez,
     /// yalnızca bölgeye giriş/çıkış bildirilir. Çalışması için <see cref="SetShared"/>(true) açık ve arka plan konum izni
     /// verilmiş olmalıdır: izni ve gerekli bildirimleri (iOS <c>NSLocationAlwaysAndWhenInUseUsageDescription</c>, Android
-    /// <c>ACCESS_BACKGROUND_LOCATION</c> + <c>play-services-location</c>) uygulama ekler; köprü izin istemez.
+    /// <c>ACCESS_BACKGROUND_LOCATION</c> + <c>play-services-location</c>) uygulama ekler; bu çağrı izin istemez
+    /// (izin için <see cref="RequestBackgroundPermissionAsync"/>).
     /// Kapatınca kayıtlı bölgeler kaldırılır.
     /// </summary>
     public void SetGeofencingEnabled(bool enabled) => Pushizo.Platform().SetGeofencingEnabled(enabled);
@@ -551,6 +589,23 @@ public sealed class PlacementsManager
         if (string.IsNullOrWhiteSpace(message.Id)) throw new ArgumentException("Mesaj kimliği gerekli.", nameof(message));
         return message;
     }
+}
+
+/// <summary>
+/// Mobil reklam kimliği (<c>Pushizo.Ads</c>, ADR-0037). SDK reklam kitaplığı içermez: uygulama, kullanıcı izin verdiyse
+/// (Android <c>AdvertisingIdClient</c>, iOS App Tracking Transparency + <c>ASIdentifierManager</c>) aldığı kimliği verir.
+/// Kimlik yalnızca <c>ads_personalization</c> rızası olan kullanıcıda ve SHA-256 özetiyle reklam kitlesine gönderilir.
+/// Windows ve MacCatalyst hedeflerinde etkisizdir.
+/// </summary>
+public sealed class AdsManager
+{
+    internal AdsManager()
+    {
+    }
+
+    /// <summary>Reklam kimliğini (GAID/IDFA) yazar; null, boş veya sıfır kimlik sunucudaki kaydı siler.</summary>
+    public void SetAdvertisingId(string? id) =>
+        Pushizo.Platform().SetAdvertisingId(string.IsNullOrWhiteSpace(id) ? null : id.Trim());
 }
 
 /// <summary>Hata ayıklama (<c>Pushizo.Debug</c>).</summary>

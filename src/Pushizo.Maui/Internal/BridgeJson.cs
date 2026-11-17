@@ -347,6 +347,56 @@ internal static class BridgeJson
         return System.Text.Encoding.UTF8.GetString(stream.ToArray());
     }
 
+    /// <summary><c>{"consents":[{"purpose","granted","source","updatedAt"}]}</c>; amaçsız kayıt atlanır (yerel SDK'larla aynı).</summary>
+    public static IReadOnlyList<UserConsent> ParseConsents(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw Invalid("consents");
+        var consents = new List<UserConsent>();
+        if (root.TryGetProperty("consents", out var list) && list.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var e in list.EnumerateArray())
+            {
+                if (e.ValueKind != JsonValueKind.Object) continue;
+                var purpose = Str(e, "purpose");
+                if (string.IsNullOrEmpty(purpose)) continue;
+                consents.Add(new UserConsent
+                {
+                    Purpose = purpose,
+                    Granted = Bool(e, "granted"),
+                    Source = Str(e, "source"),
+                    UpdatedAt = Millis(e, "updatedAt"),
+                });
+            }
+        }
+        return consents;
+    }
+
+    /// <summary>Profille giriş yükü: <c>{"email","sms","tags":{},"aliases":{}}</c>; boş alanlar yazılmaz.</summary>
+    public static string UserProfileToJson(PushizoUserProfile profile)
+    {
+        using var stream = new MemoryStream();
+        using (var w = new Utf8JsonWriter(stream))
+        {
+            w.WriteStartObject();
+            if (profile.Email is not null) w.WriteString("email", profile.Email);
+            if (profile.Sms is not null) w.WriteString("sms", profile.Sms);
+            WriteMap(w, "tags", profile.Tags);
+            WriteMap(w, "aliases", profile.Aliases);
+            w.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        static void WriteMap(Utf8JsonWriter w, string name, IReadOnlyDictionary<string, string>? map)
+        {
+            if (map is null || map.Count == 0) return;
+            w.WriteStartObject(name);
+            foreach (var (key, value) in map) w.WriteString(key, value);
+            w.WriteEndObject();
+        }
+    }
+
     /// <summary>Yerel köprünün başlatma seçenekleri (<c>PushizoMauiBridge.start</c> / <c>HSMauiBridge.start</c>).</summary>
     public static string OptionsToJson(PushizoOptions options)
     {

@@ -53,6 +53,8 @@ public static class Pushizo
     public static FeatureFlagsManager FeatureFlags { get; } = new();
     /// <summary>Gömülü yerleşimler (ADR-0068).</summary>
     public static PlacementsManager Placements { get; } = new();
+    /// <summary>Mobil reklam kimliği (ADR-0037).</summary>
+    public static AdsManager Ads { get; } = new();
     public static DebugManager Debug { get; } = new();
 
     /// <summary>
@@ -101,6 +103,30 @@ public static class Pushizo
         if (string.IsNullOrWhiteSpace(externalId)) throw new ArgumentException("externalId gerekli.", nameof(externalId));
         Platform().Login(
             externalId,
+            string.IsNullOrEmpty(identityHash) ? null : identityHash,
+            string.IsNullOrWhiteSpace(jwt) ? null : jwt);
+    }
+
+    /// <summary>
+    /// Kullanıcıyı kimliklendirir ve <paramref name="profile"/> alanlarını (e-posta, SMS, tag, alias) tek çağrıda ayarlar.
+    /// Kimlik kanıtı diğer <c>Login</c> ile aynıdır. Profil girişten önce doğrulanır: geçersiz alanda
+    /// <see cref="ArgumentException"/> fırlatılır ve giriş yapılmaz.
+    /// </summary>
+    /// <exception cref="PushizoException">Verilen kanıt app'in kimlik doğrulama kipine uymuyorsa (<c>NOT_READY</c>).</exception>
+    public static void Login(string externalId, PushizoUserProfile profile, string? identityHash = null, string? jwt = null)
+    {
+        if (string.IsNullOrWhiteSpace(externalId)) throw new ArgumentException("externalId gerekli.", nameof(externalId));
+        var tags = profile.Tags is null ? null : Validation.RequireTags(profile.Tags, nameof(profile));
+        var normalized = new PushizoUserProfile
+        {
+            Email = profile.Email is null ? null : Validation.RequireEmail(profile.Email, nameof(profile)),
+            Sms = profile.Sms is null ? null : Validation.RequirePhone(profile.Sms, nameof(profile)),
+            Tags = tags is { Count: > 0 } ? tags : null,
+            Aliases = profile.Aliases is { Count: > 0 } ? Validation.NormalizeAliases(profile.Aliases, nameof(profile)) : null,
+        };
+        Platform().Login(
+            externalId,
+            normalized,
             string.IsNullOrEmpty(identityHash) ? null : identityHash,
             string.IsNullOrWhiteSpace(jwt) ? null : jwt);
     }

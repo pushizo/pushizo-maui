@@ -4,6 +4,7 @@ import Pushizo
 #if canImport(PushizoCore)
 import PushizoCore
 #endif
+import CoreLocation
 import UIKit
 import UserNotifications
 
@@ -120,6 +121,27 @@ public final class HSMauiBridge: NSObject {
     public static func login(externalId: String, identityHash: String?, jwt: String?) -> String? {
         if let message = Pushizo.loginProofError(identityHash: identityHash, jwt: jwt) { return message }
         Pushizo.login(externalId, identityHash: identityHash, jwt: jwt)
+        return nil
+    }
+
+    /// Profille giriş: `profileJson` `{"email","sms","tags":{},"aliases":{}}` (alanlar isteğe bağlı). Yerel iOS SDK'sında
+    /// profil aşırı yüklemesi olmadığından Android davranışı burada uygulanır: e-posta/telefon girişten ÖNCE doğrulanır
+    /// (geçersizse hata mesajı döner, giriş yapılmaz), sonra giriş, ardından e-posta, SMS, tag ve alias eklenir.
+    @objc(loginWithExternalId:profileJson:identityHash:jwt:)
+    public static func loginWithProfile(externalId: String, profileJson: String, identityHash: String?, jwt: String?) -> String? {
+        let o = (jsonObject(profileJson) as? [String: Any]) ?? [:]
+        let email = o["email"] as? String
+        let sms = o["sms"] as? String
+        if let email = email, HSContacts.normalizeEmail(email) == nil { return "Geçersiz e-posta adresi" }
+        if let sms = sms, HSContacts.normalizePhone(sms) == nil { return "Geçersiz telefon numarası" }
+        if let message = Pushizo.loginProofError(identityHash: identityHash, jwt: jwt) { return message }
+        Pushizo.login(externalId, identityHash: identityHash, jwt: jwt)
+        if let email = email { Pushizo.User.addEmail(email) }
+        if let sms = sms { Pushizo.User.addSms(sms) }
+        let tags = (o["tags"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+        if !tags.isEmpty { Pushizo.User.addTags(tags) }
+        let aliases = (o["aliases"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+        if !aliases.isEmpty { Pushizo.User.addAliases(aliases) }
         return nil
     }
 
@@ -320,6 +342,8 @@ public final class HSMauiBridge: NSObject {
         case "stopListening":
             Pushizo.Chat.stopListening()
             completion(nil, nil, nil)
+        case "isListening":
+            completion(json(["listening": Pushizo.Chat.isListening]), nil, nil)
         case "attachmentUrl":
             guard let attachmentId = str("attachmentId") else { completion(nil, "INVALID_ARGUMENT", "attachmentId gerekli"); return }
             inbox(completion) { json(["url": try Pushizo.Chat.attachmentUrl(attachmentId, download: a["download"] as? Bool ?? false).absoluteString]) }
@@ -415,6 +439,34 @@ public final class HSMauiBridge: NSObject {
         }
     }
 
+    // MARK: Reklam rızası ve reklam kimliği (ADR-0037)
+
+    /// Reklam kişiselleştirme rızasını yazar; başarı JSON'u `getPreferences` ile aynıdır (güncel liste).
+    @objc(setAdsPersonalizationConsent:completion:)
+    public static func setAdsPersonalizationConsent(_ granted: Bool, completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let result: HSPreferencesResult = try await Pushizo.User.setAdsPersonalizationConsent(granted)
+            return jsonString(preferencesResultJson(result))
+        }
+    }
+
+    /// Başarı JSON'u: `{"consents":[{"purpose","granted","source","updatedAt"}]}` (zaman epoch ms).
+    @objc(getConsentsWithCompletion:)
+    public static func getConsents(completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let consents = try await Pushizo.User.getConsents()
+            return jsonString(["consents": consents.map { consentJson($0) }])
+        }
+    }
+
+    /// Reklam kimliği (IDFA); nil veya sıfır kimlik sunucudaki kaydı siler.
+    @objc(setAdvertisingId:)
+    public static func setAdvertisingId(_ id: String?) { Pushizo.Ads.setAdvertisingId(id) }
+
+    /// Uygulama rozetini ayarlar ve bildirim uzantısıyla paylaşılan sayacı eşitler (0 rozeti sıfırlar).
+    @objc(setBadgeCount:)
+    public static func setBadgeCount(_ count: Int) { Pushizo.Notifications.setBadgeCount(max(0, count)) }
+
     // MARK: Oturum
 
     /// `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez.
@@ -463,6 +515,29 @@ public final class HSMauiBridge: NSObject {
     @objc(requestLocationPermissionWithRationale:completion:)
     public static func requestLocationPermission(rationale: String?, completion: @escaping (Bool) -> Void) {
         Pushizo.Location.requestPermission(rationale: rationale, completion: completion)
+    }
+
+    /// Konum izni verilmiş mi ("kullanırken" veya "her zaman"). Yerel SDK'da karşılığı olmadığından sistem durumundan okunur.
+    @objc(locationPermissionGranted)
+    public static func locationPermissionGranted() -> Bool {
+        let status = locationAuthorization()
+        return status == .authorizedWhenInUse || status == .authorizedAlways
+    }
+
+    /// Arka plan ("her zaman") konum izni verilmiş mi.
+    @objc(locationBackgroundPermissionGranted)
+    public static func locationBackgroundPermissionGranted() -> Bool { locationAuthorization() == .authorizedAlways }
+
+    /// "Her zaman" konum iznini ister (Android'deki arka plan konum izninin karşılığı); önce "kullanırken" izni verilmiş
+    /// olmalıdır. `completion` ana iş parçacığında bir kez çağrılır.
+    @objc(requestBackgroundLocationPermissionWithCompletion:)
+    public static func requestBackgroundLocationPermission(completion: @escaping (Bool) -> Void) {
+        Pushizo.Location.requestAlwaysPermission(completion: completion)
+    }
+
+    private static func locationAuthorization() -> CLAuthorizationStatus {
+        if #available(iOS 14.0, *) { return CLLocationManager().authorizationStatus }
+        return CLLocationManager.authorizationStatus()
     }
 
     /// Arka plan bölge izleme açık mı (kalıcı tercih; ADR-0065, varsayılan kapalı).
@@ -745,6 +820,15 @@ public final class HSMauiBridge: NSObject {
             "explicit": p.explicit,
             "source": p.source ?? NSNull(),
             "updatedAt": millis(p.updatedAt),
+        ]
+    }
+
+    private static func consentJson(_ c: HSUserConsent) -> [String: Any] {
+        [
+            "purpose": c.purpose,
+            "granted": c.granted,
+            "source": c.source ?? NSNull(),
+            "updatedAt": millis(c.updatedAt),
         ]
     }
 

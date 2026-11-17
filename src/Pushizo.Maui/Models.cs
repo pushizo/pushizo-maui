@@ -126,6 +126,36 @@ public sealed record PreferenceCategory
         : Key;
 }
 
+/// <summary>
+/// Rıza kaydı (ADR-0037; ör. <c>ads_personalization</c>). <see cref="Source"/> kaydı yazan taraftır; kayıt yoksa
+/// <see cref="UpdatedAt"/> null.
+/// </summary>
+public sealed record UserConsent
+{
+    public required string Purpose { get; init; }
+    public bool Granted { get; init; }
+    public string? Source { get; init; }
+    public DateTimeOffset? UpdatedAt { get; init; }
+}
+
+/// <summary>
+/// Girişle birlikte ayarlanan profil: <c>Pushizo.Login("user_42", new PushizoUserProfile { Email = "ali@ornek.com" })</c>.
+/// Geçersiz e-posta, telefon, tag veya alias girişten önce reddedilir; yarım kalmış bir kimlik değişimi olmaz.
+/// </summary>
+public readonly record struct PushizoUserProfile
+{
+    /// <summary>E-posta aboneliği (küçük harfe çevrilir).</summary>
+    public string? Email { get; init; }
+
+    /// <summary>SMS numarası (E.164'e normalize edilir).</summary>
+    public string? Sms { get; init; }
+
+    public IReadOnlyDictionary<string, string>? Tags { get; init; }
+
+    /// <summary>Alias'lar (etiket → kimlik; en fazla 20).</summary>
+    public IReadOnlyDictionary<string, string>? Aliases { get; init; }
+}
+
 /// <summary><c>User.GetPreferencesAsync</c> / <c>SetPreferencesAsync</c> sonucu: kullanıcının tercihleri ve app'in kategorileri.</summary>
 public sealed record UserPreferences(IReadOnlyList<UserPreference> Preferences, IReadOnlyList<PreferenceCategory> Categories);
 

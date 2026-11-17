@@ -50,6 +50,7 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
 
     public void SetConsentGiven(bool given) => Ignored(nameof(SetConsentGiven));
     public void Login(string externalId, string? identityHash, string? jwt) => Ignored(nameof(Login));
+    public void Login(string externalId, PushizoUserProfile profile, string? identityHash, string? jwt) => Ignored(nameof(Login));
     public void UpdateUserJwt(string jwt) => Ignored(nameof(UpdateUserJwt));
     public void Logout() => Ignored(nameof(Logout));
 
@@ -73,6 +74,10 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public IReadOnlyList<string> SmsNumbers => Array.Empty<string>();
     public Task<UserPreferences> GetPreferencesAsync() => NotSupported<UserPreferences>("Tercihler");
     public Task<UserPreferences> SetPreferencesAsync(IReadOnlyList<PreferenceInput> preferences) => NotSupported<UserPreferences>("Tercihler");
+    public void RegisterAdm(string token) => Ignored(nameof(RegisterAdm));
+    public Task<UserPreferences> SetAdsPersonalizationConsentAsync(bool granted) => NotSupported<UserPreferences>("Tercihler");
+    public Task<IReadOnlyList<UserConsent>> GetConsentsAsync() => NotSupported<IReadOnlyList<UserConsent>>("Tercihler");
+    public void SetAdvertisingId(string? id) => Ignored(nameof(SetAdvertisingId));
     public PushSubscriptionState PushSubscription => PushSubscriptionState.Empty;
     public void OptIn() => Ignored(nameof(OptIn));
     public void OptOut() => Ignored(nameof(OptOut));
@@ -87,6 +92,7 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public void ClearAllNotifications() => Ignored(nameof(ClearAllNotifications));
     public void RemoveNotification(string id) => Ignored(nameof(RemoveNotification));
     public void RemoveGroupedNotifications(string group) => Ignored(nameof(RemoveGroupedNotifications));
+    public void SetBadgeCount(int count) => Ignored(nameof(SetBadgeCount));
     public void AddTriggers(IReadOnlyDictionary<string, string> triggers) => Ignored(nameof(AddTriggers));
     public void RemoveTriggers(IReadOnlyList<string> keys) => Ignored(nameof(RemoveTriggers));
     public void ClearTriggers() => Ignored(nameof(ClearTriggers));
@@ -120,6 +126,15 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public Task<bool> RequestLocationPermissionAsync(string? rationale)
     {
         Ignored(nameof(RequestLocationPermissionAsync));
+        return Task.FromResult(false);
+    }
+
+    public bool LocationPermissionGranted => false;
+    public bool LocationBackgroundPermissionGranted => false;
+
+    public Task<bool> RequestBackgroundLocationPermissionAsync(string? rationale)
+    {
+        Ignored(nameof(RequestBackgroundLocationPermissionAsync));
         return Task.FromResult(false);
     }
 

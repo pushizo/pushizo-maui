@@ -23,6 +23,13 @@ internal interface INativeBridge
     /// <summary>Kanıt app'in kimlik doğrulama kipine uymuyorsa hata mesajı döner (giriş yapılmaz); başarıda null.</summary>
     string? Login(string externalId, string? identityHash, string? jwt);
 
+    /// <summary>
+    /// Profille giriş: <paramref name="profileJson"/> <c>{"email","sms","tags":{},"aliases":{}}</c> (alanlar isteğe bağlı).
+    /// Android'de yerel <c>Pushizo.login(externalId, HsUserProfile, …)</c>; iOS'ta köprü aynı sırayı uygular (doğrula, giriş,
+    /// e-posta/SMS/tag/alias). Geçersiz profil veya kanıtta hata mesajı döner (giriş yapılmaz); başarıda null.
+    /// </summary>
+    string? LoginWithProfile(string externalId, string profileJson, string? identityHash, string? jwt);
+
     /// <summary>Kimlik JWT'sini yeniler; giriş yapılmamışsa hata mesajı döner, başarıda null.</summary>
     string? UpdateUserJwt(string jwt);
     void Logout();
@@ -49,6 +56,11 @@ internal interface INativeBridge
     void RemoveEmail(string email);
     void AddSms(string phoneNumber);
     void RemoveSms(string phoneNumber);
+
+    /// <summary>
+    /// Fire OS ADM kayıt kimliği (yalnızca Android; iOS'ta etkisiz, null döner). Geçersiz kimlikte hata mesajı, başarıda null.
+    /// </summary>
+    string? RegisterAdm(string token);
 
     /// <summary><c>["adres"]</c>.</summary>
     string GetEmails();
@@ -117,6 +129,18 @@ internal interface INativeBridge
     /// </summary>
     void SetPreferences(string preferencesJson, NativeResult result);
 
+    /// <summary>Reklam kişiselleştirme rızası (ADR-0037); başarı JSON'u <see cref="GetPreferences"/> ile aynı.</summary>
+    void SetAdsPersonalizationConsent(bool granted, NativeResult result);
+
+    /// <summary>Başarı JSON'u: <c>{"consents":[{"purpose","granted","source","updatedAt"}]}</c> (zaman epoch ms).</summary>
+    void GetConsents(NativeResult result);
+
+    /// <summary>Mobil reklam kimliği (GAID/IDFA; ADR-0037); null veya sıfır kimlik sunucudaki kaydı siler.</summary>
+    void SetAdvertisingId(string? id);
+
+    /// <summary>Uygulama rozetini ayarlar (yalnızca iOS; Android'de etkisiz: rozet görünen bildirimlerden hesaplanır).</summary>
+    void SetBadgeCount(int count);
+
     /// <summary><paramref name="propertiesJson"/> JSON nesnesi; <paramref name="hasValue"/> false ise değer yok sayılır.</summary>
     void SendEvent(string name, string propertiesJson, double value, bool hasValue);
 
@@ -149,6 +173,18 @@ internal interface INativeBridge
     /// SDK'nın tr/en varsayılan metni), ardından sistem istemi. <paramref name="completion"/> güncel izin durumuyla bir kez çağrılır.
     /// </summary>
     void RequestLocationPermission(string? rationale, Action<bool> completion);
+
+    /// <summary>Konum izni (yaklaşık/hassas; iOS'ta "kullanırken" veya "her zaman") verilmiş mi.</summary>
+    bool GetLocationPermissionGranted();
+
+    /// <summary>Arka plan konum izni (Android <c>ACCESS_BACKGROUND_LOCATION</c>, iOS "her zaman") verilmiş mi.</summary>
+    bool GetLocationBackgroundPermissionGranted();
+
+    /// <summary>
+    /// Arka plan konum iznini ister (Android: açıklama diyaloğu + sistem istemi; iOS: <c>requestAlwaysPermission</c>,
+    /// <paramref name="rationale"/> yok sayılır). <paramref name="completion"/> güncel izin durumuyla bir kez çağrılır.
+    /// </summary>
+    void RequestBackgroundLocationPermission(string? rationale, Action<bool> completion);
 
     /// <summary>Arka plan bölge izleme açık mı (yerel SDK'daki kalıcı tercih; ADR-0065, varsayılan kapalı).</summary>
     bool GetGeofencingEnabled();
@@ -207,8 +243,9 @@ internal interface INativeBridge
     /// <summary>
     /// Canlı sohbet çağrısı (ADR-0040). <paramref name="method"/>: start, getConfig, getConversation, getMessages,
     /// sendMessage, sendAttachment (base64), markRead, refreshUnreadCount, getUnreadCount, leaveOfflineMessage, setTyping,
-    /// startListening, stopListening, attachmentUrl, getVisitorId. Başarı JSON'u yerel modelin camelCase sözlüğü
-    /// (sayaçlar <c>{"unreadCount"}</c>, adres <c>{"url"}</c>, kimlik <c>{"visitorId"}</c>; dönüşsüz işlemlerde null).
+    /// startListening, stopListening, isListening, attachmentUrl, getVisitorId. Başarı JSON'u yerel modelin camelCase sözlüğü
+    /// (sayaçlar <c>{"unreadCount"}</c>, adres <c>{"url"}</c>, kimlik <c>{"visitorId"}</c>, dinleme <c>{"listening"}</c>;
+    /// dönüşsüz işlemlerde null).
     /// </summary>
     void ChatCall(string method, string argsJson, NativeResult result);
 

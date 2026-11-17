@@ -91,6 +91,29 @@ public sealed class UserManager
     /// </summary>
     public Task<UserPreferences> SetPreferencesAsync(IEnumerable<PreferenceInput> preferences) =>
         Pushizo.Platform().SetPreferencesAsync(Validation.RequirePreferences(preferences, nameof(preferences)));
+
+    /// <summary>
+    /// Reklam kişiselleştirme rızası (ADR-0037): true iken kullanıcının e-posta/telefon özeti reklam platformu kitlelerine
+    /// gönderilebilir; false rızayı geri alır (sonraki kitle senkronunda platformdan çıkarılır). Güncel tercihleri döndürür.
+    /// </summary>
+    public Task<UserPreferences> SetAdsPersonalizationConsentAsync(bool granted) =>
+        Pushizo.Platform().SetAdsPersonalizationConsentAsync(granted);
+
+    /// <summary>
+    /// Rıza kayıtları (<c>ads_personalization</c> …). Abonelik kaydı tamamlanmadan <see cref="PushizoException"/>
+    /// (<c>NOT_READY</c>).
+    /// </summary>
+    public Task<IReadOnlyList<UserConsent>> GetConsentsAsync() => Pushizo.Platform().GetConsentsAsync();
+
+    /// <summary>
+    /// Fire OS ADM kayıt kimliğini ekler (ADM kaydını kendisi yapan uygulamalar için; ana FCM aboneliğinin yerine geçmez).
+    /// Yalnızca Android'de etkilidir; iOS ve diğer hedeflerde etkisizdir. Geçersiz kimlikte <see cref="ArgumentException"/>.
+    /// </summary>
+    public void RegisterAdm(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) throw new ArgumentException("ADM kayıt kimliği gerekli.", nameof(token));
+        Pushizo.Platform().RegisterAdm(token.Trim());
+    }
 }
 
 /// <summary>Push aboneliği (<c>Pushizo.User.PushSubscription</c>).</summary>

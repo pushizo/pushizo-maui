@@ -16,6 +16,9 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public string? Login(string externalId, string? identityHash, string? jwt) => PushizoMauiBridge.Login(externalId, identityHash, jwt);
 
+    public string? LoginWithProfile(string externalId, string profileJson, string? identityHash, string? jwt) =>
+        PushizoMauiBridge.LoginWithProfile(externalId, profileJson, identityHash, jwt);
+
     public string? UpdateUserJwt(string jwt) => PushizoMauiBridge.UpdateUserJwt(jwt);
 
     public void Logout() => PushizoMauiBridge.Logout();
@@ -45,6 +48,8 @@ internal sealed class AndroidNativeBridge : INativeBridge
     public void AddSms(string phoneNumber) => PushizoMauiBridge.AddSms(phoneNumber);
 
     public void RemoveSms(string phoneNumber) => PushizoMauiBridge.RemoveSms(phoneNumber);
+
+    public string? RegisterAdm(string token) => PushizoMauiBridge.RegisterAdm(token);
 
     public string GetEmails() => PushizoMauiBridge.Emails();
 
@@ -117,6 +122,16 @@ internal sealed class AndroidNativeBridge : INativeBridge
     public void SetPreferences(string preferencesJson, NativeResult result) =>
         PushizoMauiBridge.SetPreferences(preferencesJson, new ResultCallback(result));
 
+    public void SetAdsPersonalizationConsent(bool granted, NativeResult result) =>
+        PushizoMauiBridge.SetAdsPersonalizationConsent(granted, new ResultCallback(result));
+
+    public void GetConsents(NativeResult result) => PushizoMauiBridge.GetConsents(new ResultCallback(result));
+
+    public void SetAdvertisingId(string? id) => PushizoMauiBridge.SetAdvertisingId(id);
+
+    /// <summary>Android'de rozet görünen bildirimlerden hesaplanır; Kotlin köprüsü çağrıyı yok sayar.</summary>
+    public void SetBadgeCount(int count) => PushizoMauiBridge.SetBadgeCount(count);
+
     public void SendEvent(string name, string propertiesJson, double value, bool hasValue) =>
         PushizoMauiBridge.SendEvent(name, propertiesJson, value, hasValue);
 
@@ -141,6 +156,17 @@ internal sealed class AndroidNativeBridge : INativeBridge
     /// </summary>
     public void RequestLocationPermission(string? rationale, Action<bool> completion) =>
         PushizoMauiBridge.RequestLocationPermission(
+            Microsoft.Maui.ApplicationModel.Platform.CurrentActivity,
+            rationale,
+            new PermissionCallback(completion));
+
+    public bool GetLocationPermissionGranted() => PushizoMauiBridge.LocationPermissionGranted();
+
+    public bool GetLocationBackgroundPermissionGranted() => PushizoMauiBridge.LocationBackgroundPermissionGranted();
+
+    /// <summary>Açıklama diyaloğu ve sistem istemi Kotlin köprüsündedir (konum izni akışıyla aynı sonuç yolu).</summary>
+    public void RequestBackgroundLocationPermission(string? rationale, Action<bool> completion) =>
+        PushizoMauiBridge.RequestBackgroundLocationPermission(
             Microsoft.Maui.ApplicationModel.Platform.CurrentActivity,
             rationale,
             new PermissionCallback(completion));

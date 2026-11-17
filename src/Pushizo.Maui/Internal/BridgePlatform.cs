@@ -39,6 +39,9 @@ internal sealed class BridgePlatform : IPushizoPlatform
     public void Login(string externalId, string? identityHash, string? jwt) =>
         ThrowIfFailed(_bridge.Login(externalId, identityHash, jwt));
 
+    public void Login(string externalId, PushizoUserProfile profile, string? identityHash, string? jwt) =>
+        ThrowIfFailed(_bridge.LoginWithProfile(externalId, BridgeJson.UserProfileToJson(profile), identityHash, jwt));
+
     public void UpdateUserJwt(string jwt) => ThrowIfFailed(_bridge.UpdateUserJwt(jwt));
 
     /// <summary>Yerel köprünün döndürdüğü kimlik hatası (kanıt eksik, kullanıcı yok) <c>NOT_READY</c> olarak fırlatılır.</summary>
@@ -88,6 +91,19 @@ internal sealed class BridgePlatform : IPushizoPlatform
         return Call(r => _bridge.SetPreferences(json, r), result => BridgeJson.ParsePreferences(Require(result)));
     }
 
+    public void RegisterAdm(string token)
+    {
+        if (_bridge.RegisterAdm(token) is { } error) throw new ArgumentException(error, nameof(token));
+    }
+
+    public Task<UserPreferences> SetAdsPersonalizationConsentAsync(bool granted) =>
+        Call(r => _bridge.SetAdsPersonalizationConsent(granted, r), json => BridgeJson.ParsePreferences(Require(json)));
+
+    public Task<IReadOnlyList<UserConsent>> GetConsentsAsync() =>
+        Call(r => _bridge.GetConsents(r), json => BridgeJson.ParseConsents(Require(json)));
+
+    public void SetAdvertisingId(string? id) => _bridge.SetAdvertisingId(id);
+
     public PushSubscriptionState PushSubscription => BridgeJson.ParseSubscriptionState(_bridge.GetPushSubscription());
 
     public void OptIn() => _bridge.OptIn();
@@ -104,6 +120,8 @@ internal sealed class BridgePlatform : IPushizoPlatform
     public void RemoveNotification(string id) => _bridge.RemoveNotification(id);
 
     public void RemoveGroupedNotifications(string group) => _bridge.RemoveGroupedNotifications(group);
+
+    public void SetBadgeCount(int count) => _bridge.SetBadgeCount(count);
 
     public void AddTriggers(IReadOnlyDictionary<string, string> triggers) => _bridge.AddTriggers(BridgeJson.ToJson(triggers));
 
@@ -167,6 +185,13 @@ internal sealed class BridgePlatform : IPushizoPlatform
 
     public Task<bool> RequestLocationPermissionAsync(string? rationale) =>
         AskPermission(completion => _bridge.RequestLocationPermission(rationale, completion));
+
+    public bool LocationPermissionGranted => _bridge.GetLocationPermissionGranted();
+
+    public bool LocationBackgroundPermissionGranted => _bridge.GetLocationBackgroundPermissionGranted();
+
+    public Task<bool> RequestBackgroundLocationPermissionAsync(string? rationale) =>
+        AskPermission(completion => _bridge.RequestBackgroundLocationPermission(rationale, completion));
 
     public bool GeofencingEnabled => _bridge.GetGeofencingEnabled();
 
