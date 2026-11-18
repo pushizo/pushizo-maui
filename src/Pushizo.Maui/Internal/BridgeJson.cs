@@ -80,6 +80,159 @@ internal static class BridgeJson
         return ReadInboxItem(doc.RootElement);
     }
 
+    public static ContentCardFeed ParseContentCardFeed(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        var cards = new List<ContentCard>();
+        if (root.TryGetProperty("cards", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in arr.EnumerateArray())
+            {
+                if (element.ValueKind == JsonValueKind.Object) cards.Add(ReadContentCard(element));
+            }
+        }
+        var unviewed = root.TryGetProperty("unviewedCount", out var u) && u.ValueKind == JsonValueKind.Number
+            ? u.GetInt32()
+            : cards.Count(c => !c.Viewed);
+        return new ContentCardFeed(cards, unviewed);
+    }
+
+    public static ContentCard ParseContentCard(string json)
+    {
+        using var doc = Parse(json);
+        return ReadContentCard(doc.RootElement);
+    }
+
+    /// <summary><c>{"messages":[{"messageId","json"}]}</c> (<see cref="INativeBridge.PlacementsList"/>); kimliksiz öğe hatadır.</summary>
+    public static IReadOnlyList<InAppMessage> ParsePlacementMessages(string json)
+    {
+        using var doc = Parse(json);
+        var messages = new List<InAppMessage>();
+        if (doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("messages", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var element in arr.EnumerateArray())
+            {
+                if (element.ValueKind != JsonValueKind.Object) continue;
+                messages.Add(new InAppMessage(Str(element, "messageId") ?? throw Invalid("messageId"), Str(element, "json")));
+            }
+        }
+        return messages;
+    }
+
+    /// <summary><see cref="DeliverySetting"/> → köprü değeri (<c>auto_start</c> …).</summary>
+    public static string DeliverySettingWire(DeliverySetting setting) => setting switch
+    {
+        DeliverySetting.Notifications => "notifications",
+        DeliverySetting.AutoStart => "auto_start",
+        DeliverySetting.BatteryOptimization => "battery_optimization",
+        DeliverySetting.AppDetails => "app_details",
+        _ => "auto",
+    };
+
+    /// <summary>
+    /// Android teslim durumu (<see cref="INativeBridge.DeliveryStatus"/>, ADR-0092). JSON yoksa (iOS, başlatılmamış yerel
+    /// SDK) <see cref="DeliveryStatus.Unsupported"/>; yerel SDK'nın ileride ekleyeceği, bu sürümün tanımadığı ayar ekranı atlanır.
+    /// </summary>
+    public static DeliveryStatus ParseDeliveryStatus(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return DeliveryStatus.Unsupported;
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new PushizoException(PushizoException.InvalidResponse, "Köprü yanıtı JSON nesnesi değil.");
+        var settings = new List<DeliverySetting>();
+        if (root.TryGetProperty("recommendedSettings", out var arr) && arr.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var item in arr.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.String) continue;
+                switch (item.GetString())
+                {
+                    case "notifications": settings.Add(DeliverySetting.Notifications); break;
+                    case "auto_start": settings.Add(DeliverySetting.AutoStart); break;
+                    case "battery_optimization": settings.Add(DeliverySetting.BatteryOptimization); break;
+                    case "app_details": settings.Add(DeliverySetting.AppDetails); break;
+                }
+            }
+        }
+        return new DeliveryStatus
+        {
+            Supported = true,
+            Manufacturer = Str(root, "manufacturer") ?? string.Empty,
+            Brand = Str(root, "brand") ?? string.Empty,
+            Vendor = Str(root, "vendor") ?? "other",
+            AggressiveVendor = Bool(root, "aggressiveVendor"),
+            Rom = Str(root, "rom") ?? string.Empty,
+            RomVersion = Str(root, "romVersion"),
+            NotificationsEnabled = Bool(root, "notificationsEnabled"),
+            ChannelBlocked = Bool(root, "channelBlocked"),
+            BatteryOptimizationExempt = Bool(root, "batteryOptimizationExempt"),
+            BackgroundRestricted = Bool(root, "backgroundRestricted"),
+            StandbyBucket = Str(root, "standbyBucket"),
+            PowerSaveMode = Bool(root, "powerSaveMode"),
+            DataSaverEnabled = Bool(root, "dataSaverEnabled"),
+            Restricted = Bool(root, "restricted"),
+            Risk = Str(root, "risk") switch
+            {
+                "high" => DeliveryRisk.High,
+                "elevated" => DeliveryRisk.Elevated,
+                _ => DeliveryRisk.None,
+            },
+            RecommendedSettings = settings.AsReadOnly(),
+        };
+    }
+
+    /// <summary><c>{"refreshed":bool}</c> (<see cref="INativeBridge.FeatureFlagsRefresh"/>).</summary>
+    public static bool ParseRefreshed(string json)
+    {
+        using var doc = Parse(json);
+        return doc.RootElement.ValueKind == JsonValueKind.Object && Bool(doc.RootElement, "refreshed");
+    }
+
+    /// <summary>
+    /// <c>{"value":…}</c> (<see cref="INativeBridge.FeatureFlagValue"/>) → string, bool, long (tam sayı), double,
+    /// <c>Dictionary&lt;string, object?&gt;</c> veya <c>List&lt;object?&gt;</c>; değer yoksa null.
+    /// </summary>
+    public static object? ParseFlagValue(string? json)
+    {
+        if (string.IsNullOrEmpty(json)) return null;
+        using var doc = Parse(json);
+        return doc.RootElement.ValueKind == JsonValueKind.Object && doc.RootElement.TryGetProperty("value", out var value)
+            ? ReadValue(value)
+            : null;
+    }
+
+    private static object? ReadValue(JsonElement e)
+    {
+        switch (e.ValueKind)
+        {
+            case JsonValueKind.String:
+                return e.GetString();
+            case JsonValueKind.True:
+                return true;
+            case JsonValueKind.False:
+                return false;
+            case JsonValueKind.Number:
+                // Koşullu ifade iki dalı double'a birleştirmesin diye tam sayı ayrı döndürülür.
+                if (e.TryGetInt64(out var integer)) return integer;
+                return e.GetDouble();
+            case JsonValueKind.Object:
+            {
+                var map = new Dictionary<string, object?>(StringComparer.Ordinal);
+                foreach (var p in e.EnumerateObject()) map[p.Name] = ReadValue(p.Value);
+                return map;
+            }
+            case JsonValueKind.Array:
+            {
+                var items = new List<object?>();
+                foreach (var item in e.EnumerateArray()) items.Add(ReadValue(item));
+                return items;
+            }
+            default:
+                return null;
+        }
+    }
+
     /// <summary><c>{"key":"value"}</c> biçimindeki metin sözlüğü (tag/trigger).</summary>
     public static IReadOnlyDictionary<string, string> ParseStringMap(string? json)
     {
@@ -121,6 +274,28 @@ internal static class BridgeJson
         return doc.RootElement.TryGetProperty("unreadCount", out var u) && u.ValueKind == JsonValueKind.Number && u.TryGetInt32(out var n)
             ? n
             : throw Invalid("unreadCount");
+    }
+
+    /// <summary>
+    /// <c>inbox</c> olayı: <c>{"type":"listed|read|read_all|archived|count","itemId","unreadCount"}</c> (<c>itemId</c> yalnızca
+    /// tek öğe olaylarında). Bilinmeyen tür (daha yeni yerel köprü) null döner.
+    /// </summary>
+    public static InboxChangedEventArgs? ParseInboxChange(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        InboxChangeType? type = Str(root, "type") switch
+        {
+            "listed" => InboxChangeType.Listed,
+            "read" => InboxChangeType.Read,
+            "read_all" => InboxChangeType.ReadAll,
+            "archived" => InboxChangeType.Archived,
+            "count" => InboxChangeType.Count,
+            _ => null,
+        };
+        if (type is not { } kind) return null;
+        var unread = root.TryGetProperty("unreadCount", out var u) && u.ValueKind == JsonValueKind.Number && u.TryGetInt32(out var n) ? Math.Max(0, n) : 0;
+        return new InboxChangedEventArgs(kind, Str(root, "itemId"), unread);
     }
 
     /// <summary>
@@ -192,6 +367,56 @@ internal static class BridgeJson
             w.WriteEndArray();
         }
         return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    /// <summary><c>{"consents":[{"purpose","granted","source","updatedAt"}]}</c>; amaçsız kayıt atlanır (yerel SDK'larla aynı).</summary>
+    public static IReadOnlyList<UserConsent> ParseConsents(string json)
+    {
+        using var doc = Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw Invalid("consents");
+        var consents = new List<UserConsent>();
+        if (root.TryGetProperty("consents", out var list) && list.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var e in list.EnumerateArray())
+            {
+                if (e.ValueKind != JsonValueKind.Object) continue;
+                var purpose = Str(e, "purpose");
+                if (string.IsNullOrEmpty(purpose)) continue;
+                consents.Add(new UserConsent
+                {
+                    Purpose = purpose,
+                    Granted = Bool(e, "granted"),
+                    Source = Str(e, "source"),
+                    UpdatedAt = Millis(e, "updatedAt"),
+                });
+            }
+        }
+        return consents;
+    }
+
+    /// <summary>Profille giriş yükü: <c>{"email","sms","tags":{},"aliases":{}}</c>; boş alanlar yazılmaz.</summary>
+    public static string UserProfileToJson(PushizoUserProfile profile)
+    {
+        using var stream = new MemoryStream();
+        using (var w = new Utf8JsonWriter(stream))
+        {
+            w.WriteStartObject();
+            if (profile.Email is not null) w.WriteString("email", profile.Email);
+            if (profile.Sms is not null) w.WriteString("sms", profile.Sms);
+            WriteMap(w, "tags", profile.Tags);
+            WriteMap(w, "aliases", profile.Aliases);
+            w.WriteEndObject();
+        }
+        return System.Text.Encoding.UTF8.GetString(stream.ToArray());
+
+        static void WriteMap(Utf8JsonWriter w, string name, IReadOnlyDictionary<string, string>? map)
+        {
+            if (map is null || map.Count == 0) return;
+            w.WriteStartObject(name);
+            foreach (var (key, value) in map) w.WriteString(key, value);
+            w.WriteEndObject();
+        }
     }
 
     /// <summary>Yerel köprünün başlatma seçenekleri (<c>PushizoMauiBridge.start</c> / <c>HSMauiBridge.start</c>).</summary>
@@ -278,6 +503,30 @@ internal static class BridgeJson
                 : null,
         };
     }
+
+    private static ContentCard ReadContentCard(JsonElement e) => new()
+    {
+        Id = Str(e, "id") ?? throw Invalid("id"),
+        MessageId = Str(e, "messageId"),
+        Type = Str(e, "type") switch
+        {
+            "captioned_image" => ContentCardType.CaptionedImage,
+            "image_only" => ContentCardType.ImageOnly,
+            _ => ContentCardType.Classic,
+        },
+        Title = Str(e, "title"),
+        Body = Str(e, "body"),
+        Url = Str(e, "url"),
+        ImageUrl = Str(e, "imageUrl"),
+        ButtonText = Str(e, "buttonText"),
+        Data = e.TryGetProperty("data", out var data) ? ReadStringMap(data) : EmptyStringMap.Instance,
+        Pinned = Bool(e, "pinned"),
+        Priority = e.TryGetProperty("priority", out var p) && p.ValueKind == JsonValueKind.Number ? p.GetInt32() : 0,
+        Viewed = Bool(e, "viewed"),
+        Clicked = Bool(e, "clicked"),
+        ExpiresAt = Millis(e, "expiresAt"),
+        CreatedAt = Millis(e, "createdAt"),
+    };
 
     private static InboxItem ReadInboxItem(JsonElement e) => new()
     {

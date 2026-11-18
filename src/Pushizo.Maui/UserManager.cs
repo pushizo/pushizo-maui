@@ -67,6 +67,35 @@ public sealed class UserManager
         Pushizo.Platform().SetLanguage(languageCode.Trim());
     }
 
+    /// <summary>En uzun kullanıcı özelliği anahtarı (yerel iOS SDK'sıyla aynı sınır).</summary>
+    public const int MaxPropertyKeyLength = 64;
+
+    /// <summary>
+    /// Kullanıcı özelliği yazar (ör. <c>SetProperty("plan", "pro")</c>); <c>null</c> özelliği siler. Değer metin, sayı, bool,
+    /// tarih, Guid, enum, sözlük veya liste olabilir (en fazla 16 seviye; sözlük ve liste içinde null olamaz). Çevrimdışıyken
+    /// yerel kuyrukta bekler. Anahtar kırpılır; boş ya da <see cref="MaxPropertyKeyLength"/> karakterden uzun anahtarda ve
+    /// desteklenmeyen değerde <see cref="ArgumentException"/>.
+    /// </summary>
+    public void SetProperty(string key, object? value)
+    {
+        var name = key?.Trim();
+        if (string.IsNullOrEmpty(name)) throw new ArgumentException("Özellik anahtarı gerekli.", nameof(key));
+        if (name.Length > MaxPropertyKeyLength) throw new ArgumentException($"Özellik anahtarı en fazla {MaxPropertyKeyLength} karakter olabilir.", nameof(key));
+        object? normalized;
+        try
+        {
+            normalized = EventProperties.NormalizeValue(value, nameof(value));
+        }
+        catch (ArgumentException e)
+        {
+            throw new ArgumentException("Özellik değeri metin, sonlu sayı, bool, tarih, Guid, enum, sözlük veya liste olmalı (en fazla 16 seviye).", nameof(value), e);
+        }
+        // Yerel iOS SDK'sı iç içe null'ı desteklemez (özelliği sessizce yok sayar); iki platformda aynı sonuç için reddedilir.
+        if (EventProperties.ContainsNestedNull(normalized))
+            throw new ArgumentException("Özellik değerindeki sözlük ve listeler null içeremez.", nameof(value));
+        Pushizo.Platform().SetUserProperty(name, normalized);
+    }
+
     /// <summary>E-posta aboneliği ekler (küçük harfe çevrilir); geçersiz adreste <see cref="ArgumentException"/>.</summary>
     public void AddEmail(string email) => Pushizo.Platform().AddEmail(Validation.RequireEmail(email, nameof(email)));
 
@@ -91,6 +120,29 @@ public sealed class UserManager
     /// </summary>
     public Task<UserPreferences> SetPreferencesAsync(IEnumerable<PreferenceInput> preferences) =>
         Pushizo.Platform().SetPreferencesAsync(Validation.RequirePreferences(preferences, nameof(preferences)));
+
+    /// <summary>
+    /// Reklam kişiselleştirme rızası (ADR-0037): true iken kullanıcının e-posta/telefon özeti reklam platformu kitlelerine
+    /// gönderilebilir; false rızayı geri alır (sonraki kitle senkronunda platformdan çıkarılır). Güncel tercihleri döndürür.
+    /// </summary>
+    public Task<UserPreferences> SetAdsPersonalizationConsentAsync(bool granted) =>
+        Pushizo.Platform().SetAdsPersonalizationConsentAsync(granted);
+
+    /// <summary>
+    /// Rıza kayıtları (<c>ads_personalization</c> …). Abonelik kaydı tamamlanmadan <see cref="PushizoException"/>
+    /// (<c>NOT_READY</c>).
+    /// </summary>
+    public Task<IReadOnlyList<UserConsent>> GetConsentsAsync() => Pushizo.Platform().GetConsentsAsync();
+
+    /// <summary>
+    /// Fire OS ADM kayıt kimliğini ekler (ADM kaydını kendisi yapan uygulamalar için; ana FCM aboneliğinin yerine geçmez).
+    /// Yalnızca Android'de etkilidir; iOS ve diğer hedeflerde etkisizdir. Geçersiz kimlikte <see cref="ArgumentException"/>.
+    /// </summary>
+    public void RegisterAdm(string token)
+    {
+        if (string.IsNullOrWhiteSpace(token)) throw new ArgumentException("ADM kayıt kimliği gerekli.", nameof(token));
+        Pushizo.Platform().RegisterAdm(token.Trim());
+    }
 }
 
 /// <summary>Push aboneliği (<c>Pushizo.User.PushSubscription</c>).</summary>

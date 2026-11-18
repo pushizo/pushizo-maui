@@ -42,6 +42,11 @@ namespace PushizoSdk.Native.iOS
         string Login (string externalId, [NullAllowed] string identityHash, [NullAllowed] string jwt);
 
         [Static]
+        [Export ("loginWithExternalId:profileJson:identityHash:jwt:")]
+        [return: NullAllowed]
+        string LoginWithProfile (string externalId, string profileJson, [NullAllowed] string identityHash, [NullAllowed] string jwt);
+
+        [Static]
         [Export ("updateUserJwt:")]
         [return: NullAllowed]
         string UpdateUserJwt (string jwt);
@@ -87,6 +92,10 @@ namespace PushizoSdk.Native.iOS
         [Static]
         [Export ("setLanguage:")]
         void SetLanguage (string code);
+
+        [Static]
+        [Export ("setUserProperty:valueJson:")]
+        void SetUserProperty (string key, string valueJson);
 
         [Static]
         [Export ("addEmail:")]
@@ -177,6 +186,18 @@ namespace PushizoSdk.Native.iOS
         void ChatCall (string method, string argsJson, HSMauiResultHandler completion);
 
         [Static]
+        [Export ("chatShow")]
+        void ChatShow ();
+
+        [Static]
+        [Export ("chatHide")]
+        bool ChatHide ();
+
+        [Static]
+        [Export ("chatIsPresented")]
+        bool ChatIsPresented ();
+
+        [Static]
         [Export ("inboxListWithLimit:cursor:completion:")]
         void InboxList (nint limit, [NullAllowed] string cursor, HSMauiResultHandler completion);
 
@@ -197,6 +218,14 @@ namespace PushizoSdk.Native.iOS
         void InboxUnreadCount (HSMauiResultHandler completion);
 
         [Static]
+        [Export ("contentCardsListWithLimit:completion:")]
+        void ContentCardsList (nint limit, HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("contentCardEvent:eventName:completion:")]
+        void ContentCardEvent (string id, string eventName, HSMauiResultHandler completion);
+
+        [Static]
         [Export ("getPreferencesWithCompletion:")]
         void GetPreferences (HSMauiResultHandler completion);
 
@@ -205,8 +234,28 @@ namespace PushizoSdk.Native.iOS
         void SetPreferences (string preferencesJson, HSMauiResultHandler completion);
 
         [Static]
-        [Export ("sendEvent:propertiesJson:value:hasValue:")]
-        void SendEvent (string name, string propertiesJson, double value, bool hasValue);
+        [Export ("setAdsPersonalizationConsent:completion:")]
+        void SetAdsPersonalizationConsent (bool granted, HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("getConsentsWithCompletion:")]
+        void GetConsents (HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("setAdvertisingId:")]
+        void SetAdvertisingId ([NullAllowed] string id);
+
+        [Static]
+        [Export ("setBadgeCount:")]
+        void SetBadgeCount (nint count);
+
+        [Static]
+        [Export ("badgeCount")]
+        nint BadgeCount ();
+
+        [Static]
+        [Export ("sendEvent:propertiesJson:value:hasValue:eventId:")]
+        void SendEvent (string name, string propertiesJson, double value, bool hasValue, [NullAllowed] string eventId);
 
         [Static]
         [Export ("setupDefaultLiveActivityWithCompletion:")]
@@ -227,6 +276,55 @@ namespace PushizoSdk.Native.iOS
         [Static]
         [Export ("requestLocationPermissionWithRationale:completion:")]
         void RequestLocationPermission ([NullAllowed] string rationale, HSMauiPermissionHandler completion);
+
+        [Static]
+        [Export ("locationPermissionGranted")]
+        bool LocationPermissionGranted ();
+
+        [Static]
+        [Export ("locationBackgroundPermissionGranted")]
+        bool LocationBackgroundPermissionGranted ();
+
+        [Static]
+        [Export ("requestBackgroundLocationPermissionWithCompletion:")]
+        void RequestBackgroundLocationPermission (HSMauiPermissionHandler completion);
+
+        [Static]
+        [Export ("geofencingEnabled")]
+        bool GeofencingEnabled ();
+
+        [Static]
+        [Export ("updateGeofencingEnabled:")]
+        void UpdateGeofencingEnabled (bool enabled);
+
+        [Static]
+        [Export ("featureFlagsRefreshWithCompletion:")]
+        void FeatureFlagsRefresh (HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("featureFlagEnabled:fallback:")]
+        bool FeatureFlagEnabled (string key, bool fallback);
+
+        [Static]
+        [Export ("featureFlagValue:")]
+        [return: NullAllowed]
+        string FeatureFlagValue (string key);
+
+        [Static]
+        [Export ("placementsList:limit:completion:")]
+        void PlacementsList (string key, nint limit, HSMauiResultHandler completion);
+
+        [Static]
+        [Export ("placementsReportImpression:")]
+        void PlacementsReportImpression (string messageId);
+
+        [Static]
+        [Export ("placementsReportClick:buttonId:")]
+        void PlacementsReportClick (string messageId, string buttonId);
+
+        [Static]
+        [Export ("placementsReportDismiss:")]
+        void PlacementsReportDismiss (string messageId);
 
         [Static]
         [Export ("foregroundPreventDefault:")]

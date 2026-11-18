@@ -19,6 +19,7 @@ internal static class PlatformFactory
 /// Yerel Pushizo SDK'sı olmayan hedefler (Windows, MacCatalyst, platformdan bağımsız net8.0): yazma çağrıları
 /// etkisizdir ve bir kez uyarı günlüğe yazılır; okuma çağrıları boş değer, izin istekleri (bildirim, konum) false,
 /// bildirim kutusu, tercihler ve Live Activities <see cref="PushizoException.PlatformNotSupported"/> döndürür.
+/// Özellik bayrakları koddaki varsayılanı, gömülü yerleşimler boş liste verir.
 /// </summary>
 internal sealed class UnsupportedPlatform : IPushizoPlatform
 {
@@ -49,6 +50,7 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
 
     public void SetConsentGiven(bool given) => Ignored(nameof(SetConsentGiven));
     public void Login(string externalId, string? identityHash, string? jwt) => Ignored(nameof(Login));
+    public void Login(string externalId, PushizoUserProfile profile, string? identityHash, string? jwt) => Ignored(nameof(Login));
     public void UpdateUserJwt(string jwt) => Ignored(nameof(UpdateUserJwt));
     public void Logout() => Ignored(nameof(Logout));
 
@@ -64,6 +66,7 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public void AddAliases(IReadOnlyDictionary<string, string> aliases) => Ignored(nameof(AddAliases));
     public void RemoveAlias(string label) => Ignored(nameof(RemoveAlias));
     public void SetLanguage(string languageCode) => Ignored(nameof(SetLanguage));
+    public void SetUserProperty(string key, object? value) => Ignored(nameof(SetUserProperty));
     public void AddEmail(string email) => Ignored(nameof(AddEmail));
     public void RemoveEmail(string email) => Ignored(nameof(RemoveEmail));
     public void AddSms(string phoneNumber) => Ignored(nameof(AddSms));
@@ -72,6 +75,10 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public IReadOnlyList<string> SmsNumbers => Array.Empty<string>();
     public Task<UserPreferences> GetPreferencesAsync() => NotSupported<UserPreferences>("Tercihler");
     public Task<UserPreferences> SetPreferencesAsync(IReadOnlyList<PreferenceInput> preferences) => NotSupported<UserPreferences>("Tercihler");
+    public void RegisterAdm(string token) => Ignored(nameof(RegisterAdm));
+    public Task<UserPreferences> SetAdsPersonalizationConsentAsync(bool granted) => NotSupported<UserPreferences>("Tercihler");
+    public Task<IReadOnlyList<UserConsent>> GetConsentsAsync() => NotSupported<IReadOnlyList<UserConsent>>("Tercihler");
+    public void SetAdvertisingId(string? id) => Ignored(nameof(SetAdvertisingId));
     public PushSubscriptionState PushSubscription => PushSubscriptionState.Empty;
     public void OptIn() => Ignored(nameof(OptIn));
     public void OptOut() => Ignored(nameof(OptOut));
@@ -86,6 +93,14 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     public void ClearAllNotifications() => Ignored(nameof(ClearAllNotifications));
     public void RemoveNotification(string id) => Ignored(nameof(RemoveNotification));
     public void RemoveGroupedNotifications(string group) => Ignored(nameof(RemoveGroupedNotifications));
+
+    public bool SetBadgeCount(int count)
+    {
+        Ignored(nameof(SetBadgeCount));
+        return false;
+    }
+
+    public int BadgeCount => 0;
     public void AddTriggers(IReadOnlyDictionary<string, string> triggers) => Ignored(nameof(AddTriggers));
     public void RemoveTriggers(IReadOnlyList<string> keys) => Ignored(nameof(RemoveTriggers));
     public void ClearTriggers() => Ignored(nameof(ClearTriggers));
@@ -99,12 +114,19 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
     }
 
     public Task<string?> ChatCallAsync(string method, string argsJson) => NotSupported<string?>("Canlı sohbet");
+
+    // Hazır sohbet arayüzü: açma etkisiz, kapatma ve durum false (hata fırlatılmaz).
+    public void ChatShow() => Ignored(nameof(ChatShow));
+    public bool ChatHide() => false;
+    public bool ChatIsPresented => false;
     public Task<InboxPage> InboxListAsync(int limit, string? cursor) => NotSupported<InboxPage>();
     public Task<InboxItem> InboxMarkReadAsync(string id) => NotSupported<InboxItem>();
     public Task<int> InboxMarkAllReadAsync() => NotSupported<int>();
     public Task InboxArchiveAsync(string id) => NotSupported<bool>();
     public Task<int> InboxUnreadCountAsync() => NotSupported<int>();
-    public void SendEvent(string name, Dictionary<string, object?> properties, double? value) => Ignored(nameof(SendEvent));
+    public Task<ContentCardFeed> ContentCardsListAsync(int limit) => NotSupported<ContentCardFeed>();
+    public Task<ContentCard> ContentCardEventAsync(string id, string eventName) => NotSupported<ContentCard>();
+    public void SendEvent(string name, Dictionary<string, object?> properties, double? value, string? eventId) => Ignored(nameof(SendEvent));
     public Task SetupDefaultLiveActivityAsync() => LiveActivitiesNotSupported();
 
     public Task StartDefaultLiveActivityAsync(string activityId, IReadOnlyDictionary<string, object> attributes, IReadOnlyDictionary<string, object> contentState) =>
@@ -119,4 +141,42 @@ internal sealed class UnsupportedPlatform : IPushizoPlatform
         Ignored(nameof(RequestLocationPermissionAsync));
         return Task.FromResult(false);
     }
+
+    public bool LocationPermissionGranted => false;
+    public bool LocationBackgroundPermissionGranted => false;
+
+    public Task<bool> RequestBackgroundLocationPermissionAsync(string? rationale)
+    {
+        Ignored(nameof(RequestBackgroundLocationPermissionAsync));
+        return Task.FromResult(false);
+    }
+
+    public bool GeofencingEnabled => false;
+    public void SetGeofencingEnabled(bool enabled) => Ignored(nameof(SetGeofencingEnabled));
+
+    // Android teslimat güçlendirme (ADR-0092): teşhis yok, risk yok; ayar ekranı ve diyalog açılmaz (hata fırlatılmaz).
+    public DeliveryStatus GetDeliveryStatus() => DeliveryStatus.Unsupported;
+    public bool ShouldShowDeliveryGuidance(int minIntervalDays) => false;
+    public bool OpenDeliverySettings(DeliverySetting setting) => false;
+    public Task<bool> ShowDeliveryGuidanceAsync(DeliverySetting setting, string? message) => Task.FromResult(false);
+
+    // Özellik bayrakları ve yerleşimler: yerel SDK'nın "değer/içerik yok" durumuyla aynı (varsayılan değer, boş liste).
+    public Task<bool> RefreshFeatureFlagsAsync()
+    {
+        Ignored(nameof(RefreshFeatureFlagsAsync));
+        return Task.FromResult(false);
+    }
+
+    public bool IsFeatureFlagEnabled(string key, bool defaultValue) => defaultValue;
+    public object? GetFeatureFlagValue(string key) => null;
+
+    public Task<IReadOnlyList<InAppMessage>> PlacementsListAsync(string key, int limit)
+    {
+        Ignored(nameof(PlacementsListAsync));
+        return Task.FromResult<IReadOnlyList<InAppMessage>>(Array.Empty<InAppMessage>());
+    }
+
+    public void PlacementsReportImpression(string messageId) => Ignored(nameof(PlacementsReportImpression));
+    public void PlacementsReportClick(string messageId, string buttonId) => Ignored(nameof(PlacementsReportClick));
+    public void PlacementsReportDismiss(string messageId) => Ignored(nameof(PlacementsReportDismiss));
 }

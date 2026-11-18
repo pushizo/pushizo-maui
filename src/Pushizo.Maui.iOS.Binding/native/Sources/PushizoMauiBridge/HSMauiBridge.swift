@@ -24,6 +24,11 @@ public final class HSMauiBridge: NSObject {
     private static var cachedPermission = false
     private static var cachedStateKnown = false
     private static let lifecycleRelay = LifecycleRelay()
+    private static let maxPlacementMessages = 50
+    /// Son `placementsList` yanıtlarındaki mesajlar (kimlik → yerel değer); rapor çağrıları mesajı buradan bulur.
+    private static var placementMessages: [String: HSInAppMessage] = [:]
+    /// Önbellek sırası (en eskiden en yeniye); sınır aşılınca en eski düşer.
+    private static var placementOrder: [String] = []
 
     // MARK: Başlatma
 
@@ -77,6 +82,10 @@ public final class HSMauiBridge: NSObject {
                 emit("chat", payload)
             }
             Pushizo.Chat.addOpenListener { info in emit("chatOpen", info.dictionary) }
+            // Özellik bayrakları sunucudan yenilendi → `featureFlags` (`{}`); bildirim kutusu değişti → `inbox`
+            // (`{"type":"listed|read|read_all|archived|count","itemId","unreadCount"}`). İkisi de ana iş parçacığında.
+            Pushizo.FeatureFlags.addObserver { emit("featureFlags", [:]) }
+            Pushizo.Inbox.addObserver { event in emit("inbox", event.dictionary) }
             // Yerel SDK izin gözlemcisi → `permission` olayı (`{"permission":bool}`): requestPermission sonrası ve uygulama
             // yeniden etkinleştiğinde (izin Ayarlar'dan değişmiş olabilir) etkin izin değiştiyse çağrılır.
             Pushizo.Notifications.addPermissionObserver { granted in
@@ -116,6 +125,28 @@ public final class HSMauiBridge: NSObject {
         if let message = Pushizo.loginProofError(identityHash: identityHash, jwt: jwt) { return message }
         Pushizo.login(externalId, identityHash: identityHash, jwt: jwt)
         return nil
+    }
+
+    /// Profille giriş: `profileJson` `{"email","sms","tags":{},"aliases":{}}` (alanlar isteğe bağlı). Yerel SDK profili ve
+    /// kanıtı girişten ÖNCE doğrular: geçersizse hata mesajı döner ve giriş yapılmaz; başarıda nil (profil işlemleri
+    /// girişten sonra kuyruğa yazılır).
+    @objc(loginWithExternalId:profileJson:identityHash:jwt:)
+    public static func loginWithProfile(externalId: String, profileJson: String, identityHash: String?, jwt: String?) -> String? {
+        let o = (jsonObject(profileJson) as? [String: Any]) ?? [:]
+        let profile = HSUserProfile(
+            email: o["email"] as? String,
+            sms: o["sms"] as? String,
+            tags: (o["tags"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String },
+            aliases: (o["aliases"] as? [String: Any] ?? [:]).compactMapValues { $0 as? String }
+        )
+        do {
+            try Pushizo.login(externalId, profile: profile, identityHash: identityHash, jwt: jwt)
+            return nil
+        } catch HSError.invalidArgument(let message) {
+            return message
+        } catch {
+            return "Pushizo başlatılmadı"
+        }
     }
 
     /// Kimlik JWT'sini yeniler; giriş yapılmamışsa hata mesajı döner, başarıda nil.
@@ -163,6 +194,14 @@ public final class HSMauiBridge: NSObject {
 
     @objc(setLanguage:)
     public static func setLanguage(_ code: String) { Pushizo.User.setLanguage(code) }
+
+    /// Kullanıcı özelliği: `valueJson` `{"value":…}` (metin, sayı, mantıksal, dizi, nesne; `null` özelliği siler). Geçersiz
+    /// girdi yerel SDK'da günlüğe yazılıp yok sayılır.
+    @objc(setUserProperty:valueJson:)
+    public static func setUserProperty(_ key: String, valueJson: String) {
+        let value = (jsonObject(valueJson) as? [String: Any])?["value"]
+        Pushizo.User.setProperty(key, value is NSNull ? nil : value)
+    }
 
     @objc(addEmail:)
     public static func addEmail(_ email: String) { Pushizo.User.addEmail(email) }
@@ -315,6 +354,8 @@ public final class HSMauiBridge: NSObject {
         case "stopListening":
             Pushizo.Chat.stopListening()
             completion(nil, nil, nil)
+        case "isListening":
+            completion(json(["listening": Pushizo.Chat.isListening]), nil, nil)
         case "attachmentUrl":
             guard let attachmentId = str("attachmentId") else { completion(nil, "INVALID_ARGUMENT", "attachmentId gerekli"); return }
             inbox(completion) { json(["url": try Pushizo.Chat.attachmentUrl(attachmentId, download: a["download"] as? Bool ?? false).absoluteString]) }
@@ -324,6 +365,22 @@ public final class HSMauiBridge: NSObject {
             completion(nil, "INVALID_ARGUMENT", "bilinmeyen sohbet yöntemi: \(method)")
         }
     }
+
+    /// Hazır sohbet ekranını etkin sahnenin en üstteki görünüm denetleyicisinden modal açar (zaten açıksa yeniden açılmaz).
+    @objc(chatShow)
+    public static func chatShow() { Pushizo.Chat.show() }
+
+    /// `chatShow` ile açılan ekranı kapatır; ekran açıktıysa true.
+    @objc(chatHide)
+    public static func chatHide() -> Bool {
+        let presented = chatIsPresented()
+        Pushizo.Chat.hide()
+        return presented
+    }
+
+    /// Hazır sohbet ekranı şu an görünüyor mu (UIKit durumu ana iş parçacığında okunur).
+    @objc(chatIsPresented)
+    public static func chatIsPresented() -> Bool { readOnMain { Pushizo.Chat.isPresented } }
 
     @objc(inboxListWithLimit:cursor:completion:)
     public static func inboxList(limit: Int, cursor: String?, completion: @escaping (String?, String?, String?) -> Void) {
@@ -365,6 +422,29 @@ public final class HSMauiBridge: NSObject {
         }
     }
 
+    // MARK: İçerik kartları (ADR-0082)
+
+    @objc(contentCardsListWithLimit:completion:)
+    public static func contentCardsList(limit: Int, completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let feed = try await Pushizo.ContentCards.list(limit: limit)
+            return jsonString(["cards": feed.cards.map { cardJson($0) }, "unviewedCount": feed.unviewedCount])
+        }
+    }
+
+    /// `eventName`: impression | click | dismiss; başka değer INVALID_ARGUMENT.
+    @objc(contentCardEvent:eventName:completion:)
+    public static func contentCardEvent(_ id: String, eventName: String, completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let card: HSContentCard
+            if eventName == "impression" { card = try await Pushizo.ContentCards.logImpression(id) }
+            else if eventName == "click" { card = try await Pushizo.ContentCards.logClick(id) }
+            else if eventName == "dismiss" { card = try await Pushizo.ContentCards.dismiss(id) }
+            else { throw HSError.invalidArgument("Kart olayı impression, click veya dismiss olmalı") }
+            return jsonString(cardJson(card))
+        }
+    }
+
     // MARK: Tercihler (ADR-0019 §4)
 
     /// Başarı JSON'u: `{"preferences":[…],"categories":[…]}` (bkz. `preferencesResultJson`).
@@ -387,13 +467,46 @@ public final class HSMauiBridge: NSObject {
         }
     }
 
+    // MARK: Reklam rızası ve reklam kimliği (ADR-0037)
+
+    /// Reklam kişiselleştirme rızasını yazar; başarı JSON'u `getPreferences` ile aynıdır (güncel liste).
+    @objc(setAdsPersonalizationConsent:completion:)
+    public static func setAdsPersonalizationConsent(_ granted: Bool, completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let result: HSPreferencesResult = try await Pushizo.User.setAdsPersonalizationConsent(granted)
+            return jsonString(preferencesResultJson(result))
+        }
+    }
+
+    /// Başarı JSON'u: `{"consents":[{"purpose","granted","source","updatedAt"}]}` (zaman epoch ms).
+    @objc(getConsentsWithCompletion:)
+    public static func getConsents(completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let consents = try await Pushizo.User.getConsents()
+            return jsonString(["consents": consents.map { consentJson($0) }])
+        }
+    }
+
+    /// Reklam kimliği (IDFA); nil veya sıfır kimlik sunucudaki kaydı siler.
+    @objc(setAdvertisingId:)
+    public static func setAdvertisingId(_ id: String?) { Pushizo.Ads.setAdvertisingId(id) }
+
+    /// Uygulama rozetini ayarlar ve bildirim uzantısıyla paylaşılan sayacı eşitler (0 rozeti sıfırlar).
+    @objc(setBadgeCount:)
+    public static func setBadgeCount(_ count: Int) { Pushizo.Notifications.setBadgeCount(max(0, count)) }
+
+    /// Uygulama simgesindeki güncel rozet sayısı (yerel SDK'da okuma karşılığı olmadığından sistemden, ana iş parçacığında okunur).
+    @objc(badgeCount)
+    public static func badgeCount() -> Int { readOnMain { UIApplication.shared.applicationIconBadgeNumber } }
+
     // MARK: Oturum
 
-    /// `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez.
-    @objc(sendEvent:propertiesJson:value:hasValue:)
-    public static func sendEvent(_ name: String, propertiesJson: String, value: Double, hasValue: Bool) {
+    /// `propertiesJson` JSON nesnesi (iç içe nesne/dizi desteklenir); `hasValue` false ise değer gönderilmez. `eventId`
+    /// (isteğe bağlı) tekilleştirme kimliğidir; biçimi geçersizse yerel SDK kendi kimliğini üretir.
+    @objc(sendEvent:propertiesJson:value:hasValue:eventId:)
+    public static func sendEvent(_ name: String, propertiesJson: String, value: Double, hasValue: Bool, eventId: String?) {
         let properties = (jsonObject(propertiesJson) as? [String: Any]) ?? [:]
-        Pushizo.Session.sendEvent(name, properties: properties, value: hasValue ? value : nil)
+        Pushizo.Session.sendEvent(name, properties: properties, value: hasValue ? value : nil, eventId: eventId)
     }
 
     // MARK: Live Activities (ADR-0024)
@@ -435,6 +548,97 @@ public final class HSMauiBridge: NSObject {
     @objc(requestLocationPermissionWithRationale:completion:)
     public static func requestLocationPermission(rationale: String?, completion: @escaping (Bool) -> Void) {
         Pushizo.Location.requestPermission(rationale: rationale, completion: completion)
+    }
+
+    /// Konum izni verilmiş mi ("kullanırken" veya "her zaman"); istem göstermez.
+    @objc(locationPermissionGranted)
+    public static func locationPermissionGranted() -> Bool { Pushizo.Location.permissionGranted }
+
+    /// Arka plan ("her zaman") konum izni verilmiş mi; istem göstermez.
+    @objc(locationBackgroundPermissionGranted)
+    public static func locationBackgroundPermissionGranted() -> Bool { Pushizo.Location.backgroundPermissionGranted }
+
+    /// "Her zaman" konum iznini ister (Android'deki arka plan konum izninin karşılığı); önce "kullanırken" izni verilmiş
+    /// olmalıdır. `completion` ana iş parçacığında bir kez çağrılır.
+    @objc(requestBackgroundLocationPermissionWithCompletion:)
+    public static func requestBackgroundLocationPermission(completion: @escaping (Bool) -> Void) {
+        Pushizo.Location.requestAlwaysPermission(completion: completion)
+    }
+
+    /// Arka plan bölge izleme açık mı (kalıcı tercih; ADR-0065, varsayılan kapalı).
+    @objc(geofencingEnabled)
+    public static func geofencingEnabled() -> Bool { Pushizo.Location.isGeofencingEnabled }
+
+    /// Bölge izlemeyi açar/kapatır; köprü izin istemez, Info.plist'e açıklama eklemez ("her zaman" izni uygulamanındır).
+    @objc(updateGeofencingEnabled:)
+    public static func updateGeofencingEnabled(_ enabled: Bool) { Pushizo.Location.setGeofencingEnabled(enabled) }
+
+    // MARK: Özellik bayrakları (ADR-0066)
+
+    /// Değerleri hemen yeniler; başarı JSON'u `{"refreshed":bool}`.
+    @objc(featureFlagsRefreshWithCompletion:)
+    public static func featureFlagsRefresh(completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) { jsonString(["refreshed": await Pushizo.FeatureFlags.refresh()]) }
+    }
+
+    /// Bayrak açık mı; değer henüz yoksa `fallback`.
+    @objc(featureFlagEnabled:fallback:)
+    public static func featureFlagEnabled(_ key: String, fallback: Bool) -> Bool { Pushizo.FeatureFlags.isEnabled(key, default: fallback) }
+
+    /// `{"value":…}` (metin, sayı, mantıksal, nesne veya dizi); değer yoksa nil.
+    @objc(featureFlagValue:)
+    public static func featureFlagValue(_ key: String) -> String? {
+        guard let value = Pushizo.FeatureFlags.value(key) else { return nil }
+        return jsonString(["value": value])
+    }
+
+    // MARK: Gömülü yerleşimler (ADR-0068)
+
+    /// Alanın içeriği; başarı JSON'u `{"messages":[{"messageId","json"}]}`. Anahtar ve limit doğrulaması yerel SDK'dadır
+    /// (geçersizse `INVALID_ARGUMENT`). Dönen mesajlar rapor çağrıları için kimliğe göre saklanır (en çok 50).
+    @objc(placementsList:limit:completion:)
+    public static func placementsList(_ key: String, limit: Int, completion: @escaping (String?, String?, String?) -> Void) {
+        inbox(completion) {
+            let messages = try await Pushizo.Placements.list(key, limit: limit)
+            rememberPlacementMessages(messages)
+            return jsonString(["messages": messages.map { ["messageId": $0.id, "json": jsonString($0.raw)] }])
+        }
+    }
+
+    @objc(placementsReportImpression:)
+    public static func placementsReportImpression(_ messageId: String) {
+        if let message = placementMessage(messageId) { Pushizo.Placements.reportImpression(message) }
+    }
+
+    @objc(placementsReportClick:buttonId:)
+    public static func placementsReportClick(_ messageId: String, buttonId: String) {
+        if let message = placementMessage(messageId) { Pushizo.Placements.reportClick(message, buttonId: buttonId) }
+    }
+
+    @objc(placementsReportDismiss:)
+    public static func placementsReportDismiss(_ messageId: String) {
+        if let message = placementMessage(messageId) { Pushizo.Placements.reportDismiss(message) }
+    }
+
+    private static func rememberPlacementMessages(_ messages: [HSInAppMessage]) {
+        lock.lock(); defer { lock.unlock() }
+        for message in messages {
+            placementOrder.removeAll { $0 == message.id }
+            placementOrder.append(message.id)
+            placementMessages[message.id] = message
+        }
+        while placementOrder.count > maxPlacementMessages {
+            placementMessages.removeValue(forKey: placementOrder.removeFirst())
+        }
+    }
+
+    /// Önbellekte olmayan mesaj (eski liste, yeniden başlatma) sessizce yok sayılır.
+    private static func placementMessage(_ messageId: String) -> HSInAppMessage? {
+        lock.lock(); let message = placementMessages[messageId]; lock.unlock()
+        if message == nil, HSLog.level.rawValue >= HSLog.Level.debug.rawValue {
+            print("[Pushizo] yerleşim raporu yok sayıldı: mesaj önbellekte yok (\(messageId))")
+        }
+        return message
     }
 
     // MARK: Ön plan kararı
@@ -644,6 +848,15 @@ public final class HSMauiBridge: NSObject {
         ]
     }
 
+    private static func consentJson(_ c: HSUserConsent) -> [String: Any] {
+        [
+            "purpose": c.purpose,
+            "granted": c.granted,
+            "source": c.source ?? NSNull(),
+            "updatedAt": millis(c.updatedAt),
+        ]
+    }
+
     private static func categoryJson(_ c: HSMessageCategory) -> [String: Any] {
         [
             "key": c.key,
@@ -656,6 +869,26 @@ public final class HSMauiBridge: NSObject {
 
     private static func preferencesResultJson(_ r: HSPreferencesResult) -> [String: Any] {
         ["preferences": r.preferences.map { preferenceJson($0) }, "categories": r.categories.map { categoryJson($0) }]
+    }
+
+    private static func cardJson(_ card: HSContentCard) -> [String: Any] {
+        [
+            "id": card.id,
+            "messageId": card.messageId ?? NSNull(),
+            "type": card.type.rawValue,
+            "title": card.title ?? NSNull(),
+            "body": card.body ?? NSNull(),
+            "url": card.url ?? NSNull(),
+            "imageUrl": card.imageUrl ?? NSNull(),
+            "buttonText": card.buttonText ?? NSNull(),
+            "data": card.data,
+            "pinned": card.pinned,
+            "priority": card.priority,
+            "viewed": card.viewed,
+            "clicked": card.clicked,
+            "expiresAt": millis(card.expiresAt),
+            "createdAt": millis(card.createdAt),
+        ]
     }
 
     private static func pageJson(_ page: HSInboxPage) -> [String: Any] {

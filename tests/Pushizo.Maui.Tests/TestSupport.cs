@@ -16,7 +16,7 @@ public abstract class PushizoTestBase : IDisposable
     }
 
     protected void InitializeSdk(PushizoOptions? options = null) =>
-        Pushizo.Initialize("app_test", options ?? new PushizoOptions { ApiUrl = "https://api.example.com" });
+        Pushizo.Initialize("app_test", options ?? new PushizoOptions { ApiUrl = "https://api.pushizo.com" });
 
     public void Dispose()
     {

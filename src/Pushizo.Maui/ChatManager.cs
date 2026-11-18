@@ -272,6 +272,13 @@ public sealed class ChatManager
     /// <summary>Canlı dinlemeyi durdurur (arka plana geçişte önerilir; temsilci mesajı push ile gelir).</summary>
     public Task StopListeningAsync() => Call("stopListening", new JsonObject());
 
+    /// <summary>Canlı dinleme (SSE akışı) şu an açık mı. Yerel SDK'nın olmadığı hedeflerde false (hata fırlatılmaz).</summary>
+    public async Task<bool> IsListeningAsync()
+    {
+        if (!Pushizo.Platform().IsSupported) return false;
+        return ChatJson.ParseBool(Require(await Call("isListening", new JsonObject()).ConfigureAwait(false)), "listening");
+    }
+
     /// <summary>Ek dosyasının adresi; ziyaretçi belirtecini taşır, yalnızca görsel bileşenine verin ve loglamayın.</summary>
     public async Task<string> GetAttachmentUrlAsync(string attachmentId, bool download = false)
     {
@@ -283,6 +290,20 @@ public sealed class ChatManager
     /// <summary>Bu cihazın ziyaretçi kimliği (sohbet henüz kullanılmadıysa null).</summary>
     public async Task<string?> GetVisitorIdAsync() =>
         ChatJson.ParseString(Require(await Call("getVisitorId", new JsonObject()).ConfigureAwait(false)), "visitorId");
+
+    /// <summary>
+    /// Yerel SDK'nın hazır sohbet ekranını açar (Android <c>HsChatActivity</c>, iOS modal <c>HSChatViewController</c>); ekran
+    /// zaten açıksa yeniden açılmaz. Herhangi bir iş parçacığından çağrılabilir. Windows ve MacCatalyst hedeflerinde etkisizdir.
+    /// </summary>
+    public void Show() => Pushizo.Platform().ChatShow();
+
+    /// <summary>
+    /// <see cref="Show"/> ile açılan ekranı kapatır; açık ekran varsa true. Yerel SDK'nın olmadığı hedeflerde false.
+    /// </summary>
+    public bool Hide() => Pushizo.Platform().ChatHide();
+
+    /// <summary>Hazır sohbet ekranı şu an açık mı. Başlatılmadan önce ve yerel SDK'nın olmadığı hedeflerde false.</summary>
+    public bool IsPresented => Pushizo.PlatformOrNull()?.ChatIsPresented ?? false;
 
     private static Task<string?> Call(string method, JsonObject args) => Pushizo.Platform().ChatCallAsync(method, args.ToJsonString());
 
@@ -405,6 +426,12 @@ internal static class ChatJson
     {
         using var doc = Parse(json);
         return (int)Long(doc.RootElement, "unreadCount");
+    }
+
+    public static bool ParseBool(string json, string name)
+    {
+        using var doc = Parse(json);
+        return Bool(doc.RootElement, name);
     }
 
     public static string? ParseString(string json, string name)

@@ -130,7 +130,7 @@ public sealed class EventTests : PushizoTestBase
         Pushizo.InAppMessages.WillDismiss += (_, _) => phases.Add("willDismiss");
         Pushizo.InAppMessages.DidDismiss += (_, e) => phases.Add("didDismiss:" + e.Message.Json);
 
-        Bridge.Emit("inAppClick", """{"messageId":"iam_1","actionId":"buy","url":"https://shop.example.com"}""");
+        Bridge.Emit("inAppClick", """{"messageId":"iam_1","actionId":"buy","url":"https://shop.pushizo.com"}""");
         Bridge.Emit("inAppLifecycle", """{"event":"willDisplay","messageId":"iam_1","json":"{\"id\":\"iam_1\"}"}""");
         Bridge.Emit("inAppLifecycle", """{"event":"didDisplay","messageId":"iam_1","json":null}""");
         Bridge.Emit("inAppLifecycle", """{"event":"willDismiss","messageId":"iam_1"}""");
@@ -139,7 +139,7 @@ public sealed class EventTests : PushizoTestBase
 
         Assert.Equal("iam_1", click!.MessageId);
         Assert.Equal("buy", click.ActionId);
-        Assert.Equal("https://shop.example.com", click.Url);
+        Assert.Equal("https://shop.pushizo.com", click.Url);
         Assert.Equal(new[] { "will:iam_1", "did:iam_1", "willDismiss", "didDismiss:{}" }, phases);
     }
 

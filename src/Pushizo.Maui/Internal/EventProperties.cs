@@ -25,6 +25,20 @@ internal static class EventProperties
         return result;
     }
 
+    /// <summary>Tek bir değeri kanonik ağaca çevirir (<c>User.SetProperty</c>; kurallar olay özellikleriyle aynıdır).</summary>
+    public static object? NormalizeValue(object? value, string paramName) => NormalizeValue(value, paramName, 1);
+
+    /// <summary>Kanonik ağaçta iç içe (liste öğesi ya da sözlük değeri olarak) null var mı.</summary>
+    public static bool ContainsNestedNull(object? value) => value switch
+    {
+        Dictionary<string, object?> map => map.Values.Any(v => v is null || ContainsNestedNull(v)),
+        List<object?> items => items.Any(v => v is null || ContainsNestedNull(v)),
+        _ => false,
+    };
+
+    /// <summary>Kanonik değeri <c>{"value":…}</c> olarak yazar (köprü tek değeri bu zarfla taşır).</summary>
+    public static string ValueToJson(object? value) => ToJson(new Dictionary<string, object?>(StringComparer.Ordinal) { ["value"] = value });
+
     private static object? NormalizeValue(object? value, string paramName, int depth)
     {
         if (depth > MaxDepth) throw new ArgumentException("Olay özellikleri en fazla 16 seviye iç içe olabilir.", paramName);

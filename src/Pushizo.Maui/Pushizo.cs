@@ -6,12 +6,14 @@ namespace PushizoSdk.Maui;
 /// Pushizo .NET MAUI SDK (eski sağlayıcı v5 yüzeyiyle uyumlu). Android'de yerel <c>com.pushizo:pushizo-android</c>,
 /// iOS'ta yerel <c>Pushizo</c> Swift SDK'sı kullanılır; tetik değerlendirme, kuyruk ve teslimat geri bildirimi yereldedir.
 /// <code>
-/// Pushizo.Initialize("app_…", new PushizoOptions { ApiUrl = "https://api.example.com" });
+/// Pushizo.Initialize("app_…", new PushizoOptions { ApiUrl = "https://api.pushizo.com" });
 /// await Pushizo.Notifications.RequestPermissionAsync();
 /// Pushizo.Login("user_42");
 /// Pushizo.User.AddTag("plan", "pro");
 /// Pushizo.InAppMessages.AddTrigger("level", "gold");
 /// var page = await Pushizo.Inbox.ListAsync(limit: 20);
+/// if (Pushizo.FeatureFlags.IsEnabled("yeni_sepet")) ShowNewCart();
+/// var banners = await Pushizo.Placements.ListAsync("ana_sayfa_ust");
 /// await Pushizo.Chat.StartAsync();
 /// Pushizo.Chat.EventReceived += (_, e) => { if (e.Type == ChatEventType.Message) Show(e.Message!); };
 /// </code>
@@ -19,7 +21,7 @@ namespace PushizoSdk.Maui;
 public static class Pushizo
 {
     /// <summary>Bu C# katmanının sürümü.</summary>
-    public const string SdkVersion = "0.1.0";
+    public const string SdkVersion = "0.3.0";
 
     private static readonly object s_gate = new();
     private static IPushizoPlatform s_platform = PlatformFactory.Create();
@@ -38,11 +40,21 @@ public static class Pushizo
     public static NotificationsManager Notifications { get; } = new();
     public static InAppMessagesManager InAppMessages { get; } = new();
     public static InboxManager Inbox { get; } = new();
+    /// <summary>İçerik kartları (ADR-0082; Android ve iOS).</summary>
+    public static ContentCardsManager ContentCards { get; } = new();
     /// <summary>Canlı sohbet (ADR-0040).</summary>
     public static ChatManager Chat { get; } = new();
     public static SessionManager Session { get; } = new();
     public static LiveActivitiesManager LiveActivities { get; } = new();
     public static LocationManager Location { get; } = new();
+    /// <summary>Android teslimat güçlendirme (ADR-0092; yalnızca Android'de etkilidir).</summary>
+    public static DeliveryManager Delivery { get; } = new();
+    /// <summary>Özellik bayrakları (ADR-0066).</summary>
+    public static FeatureFlagsManager FeatureFlags { get; } = new();
+    /// <summary>Gömülü yerleşimler (ADR-0068).</summary>
+    public static PlacementsManager Placements { get; } = new();
+    /// <summary>Mobil reklam kimliği (ADR-0037).</summary>
+    public static AdsManager Ads { get; } = new();
     public static DebugManager Debug { get; } = new();
 
     /// <summary>
@@ -96,6 +108,30 @@ public static class Pushizo
     }
 
     /// <summary>
+    /// Kullanıcıyı kimliklendirir ve <paramref name="profile"/> alanlarını (e-posta, SMS, tag, alias) tek çağrıda ayarlar.
+    /// Kimlik kanıtı diğer <c>Login</c> ile aynıdır. Profil girişten önce doğrulanır: geçersiz alanda
+    /// <see cref="ArgumentException"/> fırlatılır ve giriş yapılmaz.
+    /// </summary>
+    /// <exception cref="PushizoException">Verilen kanıt app'in kimlik doğrulama kipine uymuyorsa (<c>NOT_READY</c>).</exception>
+    public static void Login(string externalId, PushizoUserProfile profile, string? identityHash = null, string? jwt = null)
+    {
+        if (string.IsNullOrWhiteSpace(externalId)) throw new ArgumentException("externalId gerekli.", nameof(externalId));
+        var tags = profile.Tags is null ? null : Validation.RequireTags(profile.Tags, nameof(profile));
+        var normalized = new PushizoUserProfile
+        {
+            Email = profile.Email is null ? null : Validation.RequireEmail(profile.Email, nameof(profile)),
+            Sms = profile.Sms is null ? null : Validation.RequirePhone(profile.Sms, nameof(profile)),
+            Tags = tags is { Count: > 0 } ? tags : null,
+            Aliases = profile.Aliases is { Count: > 0 } ? Validation.NormalizeAliases(profile.Aliases, nameof(profile)) : null,
+        };
+        Platform().Login(
+            externalId,
+            normalized,
+            string.IsNullOrEmpty(identityHash) ? null : identityHash,
+            string.IsNullOrWhiteSpace(jwt) ? null : jwt);
+    }
+
+    /// <summary>
     /// Süresi dolan veya yenilenen kimlik JWT'sini günceller; sonraki SDK istekleri yeni belirteci taşır, kuyrukta bekleyen
     /// işlemler yeniden denenir.
     /// </summary>
@@ -130,6 +166,8 @@ public static class Pushizo
             User.PushSubscription.Reset();
             Notifications.Reset();
             InAppMessages.Reset();
+            Inbox.Reset();
+            FeatureFlags.Reset();
             Chat.Reset();
             Debug.Reset();
             SdkLog.Level = LogLevel.Warn;
@@ -171,5 +209,9 @@ public static class Pushizo
         public void OnChatEvent(ChatEventArgs args) => Chat.Dispatch(args);
 
         public void OnChatOpened(ChatOpenedEventArgs args) => Chat.DispatchOpened(args);
+
+        public void OnFeatureFlagsChanged() => FeatureFlags.DispatchChanged();
+
+        public void OnInboxChanged(InboxChangedEventArgs args) => Inbox.DispatchChanged(args);
     }
 }

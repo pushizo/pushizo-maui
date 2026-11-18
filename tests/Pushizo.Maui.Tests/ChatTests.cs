@@ -53,7 +53,7 @@ public sealed class ChatTests : PushizoTestBase
         Bridge.ChatResponses["sendAttachment"] = (MessageJson, null, null);
         Bridge.ChatResponses["leaveOfflineMessage"] = (MessageJson, null, null);
         Bridge.ChatResponses["markRead"] = ("""{"unreadCount":0}""", null, null);
-        Bridge.ChatResponses["attachmentUrl"] = ("""{"url":"https://api.example.com/sdk/v1/apps/app_test/chat/attachments/att_1?visitor_id=v&token=t"}""", null, null);
+        Bridge.ChatResponses["attachmentUrl"] = ("""{"url":"https://api.pushizo.com/sdk/v1/apps/app_test/chat/attachments/att_1?visitor_id=v&token=t"}""", null, null);
 
         var page = await Pushizo.Chat.GetMessagesAsync(afterSeq: 5);
         Assert.Equal(5, LastCall().Args.GetProperty("afterSeq").GetInt64());
@@ -72,8 +72,8 @@ public sealed class ChatTests : PushizoTestBase
         await Pushizo.Chat.SendAttachmentAsync(new byte[] { 1, 2, 3 }, "a.png", "image/png");
         Assert.Equal("AQID", LastCall().Args.GetProperty("base64").GetString());
 
-        await Pushizo.Chat.LeaveOfflineMessageAsync(" ali@example.com ", "Arayın");
-        Assert.Equal("ali@example.com", LastCall().Args.GetProperty("email").GetString());
+        await Pushizo.Chat.LeaveOfflineMessageAsync(" ali@pushizo.com ", "Arayın");
+        Assert.Equal("ali@pushizo.com", LastCall().Args.GetProperty("email").GetString());
 
         Assert.Equal(0, await Pushizo.Chat.MarkReadAsync(12));
         Assert.Equal(12, LastCall().Args.GetProperty("seq").GetInt64());

@@ -72,6 +72,46 @@ public sealed class PushSubscriptionChangedEventArgs : EventArgs
     public PushSubscriptionState Current { get; }
 }
 
+/// <summary>Bildirim kutusu değişim türü (<see cref="InboxChangedEventArgs.Type"/>).</summary>
+public enum InboxChangeType
+{
+    /// <summary>Liste alındı ve okunmamış sayısı değişti.</summary>
+    Listed,
+    /// <summary>Bir öğe okundu işaretlendi (<see cref="InboxChangedEventArgs.ItemId"/>).</summary>
+    Read,
+    /// <summary>Tüm öğeler okundu işaretlendi.</summary>
+    ReadAll,
+    /// <summary>Bir öğe arşivlendi (<see cref="InboxChangedEventArgs.ItemId"/>).</summary>
+    Archived,
+    /// <summary>Okunmamış sayısı sorgulandı ve değişti.</summary>
+    Count,
+}
+
+/// <summary>Bildirim kutusu değişti (<see cref="InboxManager.Changed"/>): tür, ilgili öğe ve güncel okunmamış sayısı.</summary>
+public sealed class InboxChangedEventArgs : EventArgs
+{
+    public InboxChangedEventArgs(InboxChangeType type, string? itemId, int unreadCount)
+    {
+        Type = type;
+        ItemId = itemId;
+        UnreadCount = unreadCount;
+    }
+
+    public InboxChangeType Type { get; }
+    /// <summary>Okunan/arşivlenen öğenin kimliği; diğer türlerde null.</summary>
+    public string? ItemId { get; }
+    /// <summary>Güncel okunmamış öğe sayısı.</summary>
+    public int UnreadCount { get; }
+}
+
+/// <summary>Özellik bayrakları sunucudan yenilendi (<see cref="FeatureFlagsManager.Changed"/>).</summary>
+public sealed class FeatureFlagsChangedEventArgs : EventArgs
+{
+    internal FeatureFlagsChangedEventArgs()
+    {
+    }
+}
+
 /// <summary>In-app mesaj düğmesine tıklandı.</summary>
 public sealed class InAppMessageClickedEventArgs : EventArgs
 {

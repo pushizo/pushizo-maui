@@ -23,6 +23,14 @@ internal interface INativeBridge
     /// <summary>Kanıt app'in kimlik doğrulama kipine uymuyorsa hata mesajı döner (giriş yapılmaz); başarıda null.</summary>
     string? Login(string externalId, string? identityHash, string? jwt);
 
+    /// <summary>
+    /// Profille giriş: <paramref name="profileJson"/> <c>{"email","sms","tags":{},"aliases":{}}</c> (alanlar isteğe bağlı).
+    /// İki platformda da yerel profil girişi çağrılır (Android <c>Pushizo.login(externalId, HsUserProfile, …)</c>, iOS
+    /// <c>Pushizo.login(_:profile:identityHash:jwt:)</c>): profil ve kanıt girişten önce doğrulanır. Geçersiz profil veya
+    /// kanıtta hata mesajı döner (giriş yapılmaz); başarıda null.
+    /// </summary>
+    string? LoginWithProfile(string externalId, string profileJson, string? identityHash, string? jwt);
+
     /// <summary>Kimlik JWT'sini yeniler; giriş yapılmamışsa hata mesajı döner, başarıda null.</summary>
     string? UpdateUserJwt(string jwt);
     void Logout();
@@ -45,10 +53,21 @@ internal interface INativeBridge
     void AddAliases(string aliasesJson);
     void RemoveAlias(string label);
     void SetLanguage(string languageCode);
+
+    /// <summary>
+    /// Kullanıcı özelliği: <paramref name="valueJson"/> <c>{"value":…}</c> (metin, sayı, mantıksal, dizi, nesne; <c>null</c>
+    /// özelliği siler). Yerel SDK anahtarı reddederse hata mesajı (Android), başarıda null (iOS geçersiz girdiyi günlüğe yazar).
+    /// </summary>
+    string? SetUserProperty(string key, string valueJson);
     void AddEmail(string email);
     void RemoveEmail(string email);
     void AddSms(string phoneNumber);
     void RemoveSms(string phoneNumber);
+
+    /// <summary>
+    /// Fire OS ADM kayıt kimliği (yalnızca Android; iOS'ta etkisiz, null döner). Geçersiz kimlikte hata mesajı, başarıda null.
+    /// </summary>
+    string? RegisterAdm(string token);
 
     /// <summary><c>["adres"]</c>.</summary>
     string GetEmails();
@@ -99,6 +118,12 @@ internal interface INativeBridge
     /// <summary>Başarı JSON'u: <c>{"unreadCount":n}</c>.</summary>
     void InboxUnreadCount(NativeResult result);
 
+    /// <summary>İçerik kartları (ADR-0082): <c>{"cards":[…],"unviewedCount":n}</c>.</summary>
+    void ContentCardsList(int limit, NativeResult result);
+
+    /// <summary>Kart olayı (<c>impression</c>, <c>click</c>, <c>dismiss</c>); güncel kartı döndürür.</summary>
+    void ContentCardEvent(string id, string eventName, NativeResult result);
+
     /// <summary>
     /// Başarı JSON'u: <c>{"preferences":[{"category","channel","optedIn","explicit","source","updatedAt"}],
     /// "categories":[{"key","name":{},"description":{},"channels":[…]|null,"defaultOptedIn"}]}</c>.
@@ -111,8 +136,29 @@ internal interface INativeBridge
     /// </summary>
     void SetPreferences(string preferencesJson, NativeResult result);
 
-    /// <summary><paramref name="propertiesJson"/> JSON nesnesi; <paramref name="hasValue"/> false ise değer yok sayılır.</summary>
-    void SendEvent(string name, string propertiesJson, double value, bool hasValue);
+    /// <summary>Reklam kişiselleştirme rızası (ADR-0037); başarı JSON'u <see cref="GetPreferences"/> ile aynı.</summary>
+    void SetAdsPersonalizationConsent(bool granted, NativeResult result);
+
+    /// <summary>Başarı JSON'u: <c>{"consents":[{"purpose","granted","source","updatedAt"}]}</c> (zaman epoch ms).</summary>
+    void GetConsents(NativeResult result);
+
+    /// <summary>Mobil reklam kimliği (GAID/IDFA; ADR-0037); null veya sıfır kimlik sunucudaki kaydı siler.</summary>
+    void SetAdvertisingId(string? id);
+
+    /// <summary>
+    /// Rozet sayısını ayarlar. iOS: uygulama rozeti ve bildirim uzantısıyla paylaşılan sayaç (her zaman true). Android: sayı
+    /// yerel SDK'da saklanır ve sonraki bildirimlere yazılır; rozet bu cihazda gösterilebiliyorsa true.
+    /// </summary>
+    bool SetBadgeCount(int count);
+
+    /// <summary>Güncel rozet sayısı (Android: yerel SDK'da saklanan son sayı; iOS: uygulama simgesindeki rozet).</summary>
+    int GetBadgeCount();
+
+    /// <summary>
+    /// <paramref name="propertiesJson"/> JSON nesnesi; <paramref name="hasValue"/> false ise değer yok sayılır.
+    /// <paramref name="eventId"/> isteğe bağlı tekilleştirme kimliğidir (geçersiz biçimde yerel SDK kendi kimliğini üretir).
+    /// </summary>
+    void SendEvent(string name, string propertiesJson, double value, bool hasValue, string? eventId);
 
     /// <summary>
     /// Yerel SDK'da Live Activities var mı (yalnızca iOS). false ise <see cref="BridgePlatform"/> çağrıları köprüye
@@ -144,13 +190,89 @@ internal interface INativeBridge
     /// </summary>
     void RequestLocationPermission(string? rationale, Action<bool> completion);
 
+    /// <summary>Konum izni (yaklaşık/hassas; iOS'ta "kullanırken" veya "her zaman") verilmiş mi.</summary>
+    bool GetLocationPermissionGranted();
+
+    /// <summary>Arka plan konum izni (Android <c>ACCESS_BACKGROUND_LOCATION</c>, iOS "her zaman") verilmiş mi.</summary>
+    bool GetLocationBackgroundPermissionGranted();
+
+    /// <summary>
+    /// Arka plan konum iznini ister (Android: açıklama diyaloğu + sistem istemi; iOS: <c>requestAlwaysPermission</c>,
+    /// <paramref name="rationale"/> yok sayılır). <paramref name="completion"/> güncel izin durumuyla bir kez çağrılır.
+    /// </summary>
+    void RequestBackgroundLocationPermission(string? rationale, Action<bool> completion);
+
+    /// <summary>Arka plan bölge izleme açık mı (yerel SDK'daki kalıcı tercih; ADR-0065, varsayılan kapalı).</summary>
+    bool GetGeofencingEnabled();
+
+    /// <summary>Arka plan bölge izlemeyi açar/kapatır; köprü izin istemez (izinler uygulamanındır).</summary>
+    void SetGeofencingEnabled(bool enabled);
+
+    /// <summary>
+    /// Android teslim durumu (ADR-0092) JSON nesnesi olarak: <c>manufacturer</c>, <c>brand</c>, <c>vendor</c>,
+    /// <c>aggressiveVendor</c>, <c>rom</c>, <c>romVersion</c>, <c>notificationsEnabled</c>, <c>channelBlocked</c>,
+    /// <c>batteryOptimizationExempt</c>, <c>backgroundRestricted</c>, <c>standbyBucket</c>, <c>powerSaveMode</c>,
+    /// <c>dataSaverEnabled</c>, <c>restricted</c>, <c>risk</c>, <c>recommendedSettings</c>. Teşhisin olmadığı platformda
+    /// (iOS) veya yerel SDK başlatılmadıysa null.
+    /// </summary>
+    string? DeliveryStatus();
+
+    /// <summary>Teslim riski var ve hazır diyalog son <paramref name="minIntervalDays"/> günde gösterilmedi mi (Android dışında false).</summary>
+    bool DeliveryShouldShowGuidance(int minIntervalDays);
+
+    /// <summary>
+    /// Ayar ekranını açar. <paramref name="setting"/>: <c>auto</c> | <c>notifications</c> | <c>auto_start</c> |
+    /// <c>battery_optimization</c> | <c>app_details</c>. Ekran açıldıysa true (Android dışında false); istisna atmaz.
+    /// </summary>
+    bool DeliveryOpenSettings(string setting);
+
+    /// <summary>
+    /// Hazır açıklama diyaloğu (<paramref name="message"/> null ise yerel SDK'nın yerelleştirilmiş metni).
+    /// <paramref name="completion"/> bir kez çağrılır: kullanıcı kabul etti ve ayar ekranı açıldı mı (Android dışında false).
+    /// </summary>
+    void DeliveryShowGuidance(string setting, string? message, Action<bool> completion);
+
+    /// <summary>Özellik bayraklarını hemen yeniler (ADR-0066). Başarı JSON'u: <c>{"refreshed":bool}</c>.</summary>
+    void FeatureFlagsRefresh(NativeResult result);
+
+    /// <summary>Bayrak açık mı; değer henüz yoksa <paramref name="fallback"/>.</summary>
+    bool FeatureFlagEnabled(string key, bool fallback);
+
+    /// <summary><c>{"value":…}</c> (metin, sayı, mantıksal, nesne veya dizi); değer yoksa null.</summary>
+    string? FeatureFlagValue(string key);
+
+    /// <summary>
+    /// Gömülü yerleşim içeriği (ADR-0068). Başarı JSON'u: <c>{"messages":[{"messageId","json"}]}</c>; köprü dönen
+    /// mesajları rapor çağrıları için kimliğe göre sınırlı bir önbellekte tutar.
+    /// </summary>
+    void PlacementsList(string key, int limit, NativeResult result);
+
+    /// <summary>Gösterim bildirimi; mesaj köprü önbelleğinde yoksa yok sayılır.</summary>
+    void PlacementsReportImpression(string messageId);
+
+    /// <summary>Tıklama bildirimi; mesaj köprü önbelleğinde yoksa yok sayılır.</summary>
+    void PlacementsReportClick(string messageId, string buttonId);
+
+    /// <summary>Kapatma bildirimi; mesaj köprü önbelleğinde yoksa yok sayılır.</summary>
+    void PlacementsReportDismiss(string messageId);
+
     /// <summary>
     /// Canlı sohbet çağrısı (ADR-0040). <paramref name="method"/>: start, getConfig, getConversation, getMessages,
     /// sendMessage, sendAttachment (base64), markRead, refreshUnreadCount, getUnreadCount, leaveOfflineMessage, setTyping,
-    /// startListening, stopListening, attachmentUrl, getVisitorId. Başarı JSON'u yerel modelin camelCase sözlüğü
-    /// (sayaçlar <c>{"unreadCount"}</c>, adres <c>{"url"}</c>, kimlik <c>{"visitorId"}</c>; dönüşsüz işlemlerde null).
+    /// startListening, stopListening, isListening, attachmentUrl, getVisitorId. Başarı JSON'u yerel modelin camelCase sözlüğü
+    /// (sayaçlar <c>{"unreadCount"}</c>, adres <c>{"url"}</c>, kimlik <c>{"visitorId"}</c>, dinleme <c>{"listening"}</c>;
+    /// dönüşsüz işlemlerde null).
     /// </summary>
     void ChatCall(string method, string argsJson, NativeResult result);
+
+    /// <summary>Hazır sohbet ekranını açar (Android <c>HsChatActivity</c>, iOS modal <c>HSChatViewController</c>).</summary>
+    void ChatShow();
+
+    /// <summary>Hazır sohbet ekranını kapatır; açık ekran varsa true.</summary>
+    bool ChatHide();
+
+    /// <summary>Hazır sohbet ekranı şu an açık mı.</summary>
+    bool ChatIsPresented();
 
     /// <summary>Ön plan olayının (<c>foreground</c> olayındaki <c>eventId</c>) yerel gösterimini engeller.</summary>
     void ForegroundPreventDefault(string eventId);

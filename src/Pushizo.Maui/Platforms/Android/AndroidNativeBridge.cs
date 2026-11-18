@@ -16,6 +16,9 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public string? Login(string externalId, string? identityHash, string? jwt) => PushizoMauiBridge.Login(externalId, identityHash, jwt);
 
+    public string? LoginWithProfile(string externalId, string profileJson, string? identityHash, string? jwt) =>
+        PushizoMauiBridge.LoginWithProfile(externalId, profileJson, identityHash, jwt);
+
     public string? UpdateUserJwt(string jwt) => PushizoMauiBridge.UpdateUserJwt(jwt);
 
     public void Logout() => PushizoMauiBridge.Logout();
@@ -38,6 +41,8 @@ internal sealed class AndroidNativeBridge : INativeBridge
 
     public void SetLanguage(string languageCode) => PushizoMauiBridge.SetLanguage(languageCode);
 
+    public string? SetUserProperty(string key, string valueJson) => PushizoMauiBridge.SetUserProperty(key, valueJson);
+
     public void AddEmail(string email) => PushizoMauiBridge.AddEmail(email);
 
     public void RemoveEmail(string email) => PushizoMauiBridge.RemoveEmail(email);
@@ -45,6 +50,8 @@ internal sealed class AndroidNativeBridge : INativeBridge
     public void AddSms(string phoneNumber) => PushizoMauiBridge.AddSms(phoneNumber);
 
     public void RemoveSms(string phoneNumber) => PushizoMauiBridge.RemoveSms(phoneNumber);
+
+    public string? RegisterAdm(string token) => PushizoMauiBridge.RegisterAdm(token);
 
     public string GetEmails() => PushizoMauiBridge.Emails();
 
@@ -105,14 +112,32 @@ internal sealed class AndroidNativeBridge : INativeBridge
     public void InboxUnreadCount(NativeResult result) =>
         PushizoMauiBridge.InboxUnreadCount(new ResultCallback(result));
 
+    public void ContentCardsList(int limit, NativeResult result) =>
+        PushizoMauiBridge.ContentCardsList(limit, new ResultCallback(result));
+
+    public void ContentCardEvent(string id, string eventName, NativeResult result) =>
+        PushizoMauiBridge.ContentCardEvent(id, eventName, new ResultCallback(result));
+
     public void GetPreferences(NativeResult result) =>
         PushizoMauiBridge.GetPreferences(new ResultCallback(result));
 
     public void SetPreferences(string preferencesJson, NativeResult result) =>
         PushizoMauiBridge.SetPreferences(preferencesJson, new ResultCallback(result));
 
-    public void SendEvent(string name, string propertiesJson, double value, bool hasValue) =>
-        PushizoMauiBridge.SendEvent(name, propertiesJson, value, hasValue);
+    public void SetAdsPersonalizationConsent(bool granted, NativeResult result) =>
+        PushizoMauiBridge.SetAdsPersonalizationConsent(granted, new ResultCallback(result));
+
+    public void GetConsents(NativeResult result) => PushizoMauiBridge.GetConsents(new ResultCallback(result));
+
+    public void SetAdvertisingId(string? id) => PushizoMauiBridge.SetAdvertisingId(id);
+
+    /// <summary>Sayı yerel SDK'da saklanır ve sonraki bildirimlere yazılır; rozet bu cihazda gösterilebiliyorsa true.</summary>
+    public bool SetBadgeCount(int count) => PushizoMauiBridge.SetBadgeCount(count);
+
+    public int GetBadgeCount() => PushizoMauiBridge.BadgeCount();
+
+    public void SendEvent(string name, string propertiesJson, double value, bool hasValue, string? eventId) =>
+        PushizoMauiBridge.SendEvent(name, propertiesJson, value, hasValue, eventId);
 
     /// <summary>Live Activities iOS'a özgüdür; Android'de çağrılar köprüye ulaşmadan <c>PLATFORM_NOT_SUPPORTED</c> olur.</summary>
     public bool SupportsLiveActivities => false;
@@ -139,8 +164,60 @@ internal sealed class AndroidNativeBridge : INativeBridge
             rationale,
             new PermissionCallback(completion));
 
+    public bool GetLocationPermissionGranted() => PushizoMauiBridge.LocationPermissionGranted();
+
+    public bool GetLocationBackgroundPermissionGranted() => PushizoMauiBridge.LocationBackgroundPermissionGranted();
+
+    /// <summary>Açıklama diyaloğu ve sistem istemi Kotlin köprüsündedir (konum izni akışıyla aynı sonuç yolu).</summary>
+    public void RequestBackgroundLocationPermission(string? rationale, Action<bool> completion) =>
+        PushizoMauiBridge.RequestBackgroundLocationPermission(
+            Microsoft.Maui.ApplicationModel.Platform.CurrentActivity,
+            rationale,
+            new PermissionCallback(completion));
+
+    public bool GetGeofencingEnabled() => PushizoMauiBridge.GeofencingEnabled();
+
+    public void SetGeofencingEnabled(bool enabled) => PushizoMauiBridge.UpdateGeofencingEnabled(enabled);
+
+    public string? DeliveryStatus() => PushizoMauiBridge.DeliveryStatus();
+
+    public bool DeliveryShouldShowGuidance(int minIntervalDays) => PushizoMauiBridge.DeliveryShouldShowGuidance(minIntervalDays);
+
+    public bool DeliveryOpenSettings(string setting) =>
+        PushizoMauiBridge.DeliveryOpenSettings(Microsoft.Maui.ApplicationModel.Platform.CurrentActivity, setting);
+
+    /// <summary>Diyalog Kotlin köprüsünde etkin Activity'nin arayüz iş parçacığında gösterilir; sonuç oradan bir kez gelir.</summary>
+    public void DeliveryShowGuidance(string setting, string? message, Action<bool> completion) =>
+        PushizoMauiBridge.DeliveryShowGuidance(
+            Microsoft.Maui.ApplicationModel.Platform.CurrentActivity,
+            setting,
+            message,
+            new PermissionCallback(completion));
+
+    public void FeatureFlagsRefresh(NativeResult result) => PushizoMauiBridge.FeatureFlagsRefresh(new ResultCallback(result));
+
+    public bool FeatureFlagEnabled(string key, bool fallback) => PushizoMauiBridge.FeatureFlagEnabled(key, fallback);
+
+    public string? FeatureFlagValue(string key) => PushizoMauiBridge.FeatureFlagValue(key);
+
+    public void PlacementsList(string key, int limit, NativeResult result) =>
+        PushizoMauiBridge.PlacementsList(key, limit, new ResultCallback(result));
+
+    public void PlacementsReportImpression(string messageId) => PushizoMauiBridge.PlacementsReportImpression(messageId);
+
+    public void PlacementsReportClick(string messageId, string buttonId) => PushizoMauiBridge.PlacementsReportClick(messageId, buttonId);
+
+    public void PlacementsReportDismiss(string messageId) => PushizoMauiBridge.PlacementsReportDismiss(messageId);
+
     public void ChatCall(string method, string argsJson, NativeResult result) =>
         PushizoMauiBridge.ChatCall(method, argsJson, new ResultCallback(result));
+
+    /// <summary>Etkin Activity varsa onun üzerinden, yoksa uygulama bağlamıyla (yeni görev) açılır.</summary>
+    public void ChatShow() => PushizoMauiBridge.ChatShow(Microsoft.Maui.ApplicationModel.Platform.CurrentActivity);
+
+    public bool ChatHide() => PushizoMauiBridge.ChatHide();
+
+    public bool ChatIsPresented() => PushizoMauiBridge.ChatIsPresented();
 
     public void ForegroundPreventDefault(string eventId) => PushizoMauiBridge.ForegroundPreventDefault(eventId);
 

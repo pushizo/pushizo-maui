@@ -62,24 +62,24 @@ public sealed class UserAndSessionTests : PushizoTestBase
     [Fact]
     public void Email_and_sms_are_normalized()
     {
-        Pushizo.User.AddEmail(" Ali.Veli@Example.COM ");
-        Pushizo.User.RemoveEmail("ali.veli@example.com");
+        Pushizo.User.AddEmail(" Ali.Veli@Pushizo.COM ");
+        Pushizo.User.RemoveEmail("ali.veli@pushizo.com");
         Pushizo.User.AddSms("+90 (532) 123-45-67");
         Pushizo.User.RemoveSms("00905321234567");
 
         Assert.Equal(new[]
         {
-            "addEmail:ali.veli@example.com",
-            "removeEmail:ali.veli@example.com",
+            "addEmail:ali.veli@pushizo.com",
+            "removeEmail:ali.veli@pushizo.com",
             "addSms:+905321234567",
             "removeSms:+905321234567",
         }, Bridge.Calls);
         Assert.Throws<ArgumentException>(() => Pushizo.User.AddEmail("geçersiz"));
         Assert.Throws<ArgumentException>(() => Pushizo.User.AddSms("05321234567"));
 
-        Bridge.EmailsJson = """["ali@example.com"]""";
+        Bridge.EmailsJson = """["ali@pushizo.com"]""";
         Bridge.SmsJson = """["+905321234567"]""";
-        Assert.Equal(new[] { "ali@example.com" }, Pushizo.User.Emails);
+        Assert.Equal(new[] { "ali@pushizo.com" }, Pushizo.User.Emails);
         Assert.Equal(new[] { "+905321234567" }, Pushizo.User.SmsNumbers);
     }
 

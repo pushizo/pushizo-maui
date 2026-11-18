@@ -1,9 +1,13 @@
 <Project>
   <!-- Pushizo .NET MAUI SDK: tüm projelerde ortak sürüm ve derleme ayarları. -->
   <PropertyGroup>
-    <PushizoVersion>0.1.0</PushizoVersion>
-    <!-- Yerel Android SDK'sının (sdk/android) yayın sürümü; binding paketi bu sürümü sarar. -->
-    <PushizoNativeAndroidVersion>0.1.0</PushizoNativeAndroidVersion>
+    <PushizoVersion>0.3.0</PushizoVersion>
+    <!--
+      Yerel SDK'ların yayın sürümleri; binding paketleri bu sürümleri sarar (yayın iş akışı pushizo-android / pushizo-ios
+      depolarını bu etiketlerden alır: Android "v" önekli, iOS öneksiz).
+    -->
+    <PushizoNativeAndroidVersion>0.3.0</PushizoNativeAndroidVersion>
+    <PushizoNativeIosVersion>0.3.0</PushizoNativeIosVersion>
     <!-- MAUI paket sürümleri hedef .NET sürümüne göre seçilir (MAUI 9 paketleri net8.0 hedeflerini içermez). -->
     <MauiVersion Condition="'$(MauiVersion)' == '' and $(TargetFramework.StartsWith('net8.0'))">8.0.100</MauiVersion>
     <MauiVersion Condition="'$(MauiVersion)' == ''">9.0.120</MauiVersion>
@@ -24,8 +28,11 @@
       makinelerde (ör. yalnızca paylaşılan katmanın birim testleri) -p:PushizoIncludeAndroid=false verilir.
     -->
     <PushizoIncludeAndroid Condition="'$(PushizoIncludeAndroid)' == ''">true</PushizoIncludeAndroid>
-    <!-- net9.0 hedefleri yalnızca .NET 9+ SDK ile eklenir (.NET 8 SDK'sı net9.0 hedefini geri yükleyemez). -->
-    <PushizoNet9 Condition="'$(NETCoreSdkVersion)' != '' and $([MSBuild]::VersionGreaterThanOrEquals('$(NETCoreSdkVersion)', '9.0'))">true</PushizoNet9>
+    <!--
+      net9.0 hedefleri yalnızca .NET 9+ SDK ile eklenir (.NET 8 SDK'sı net9.0 hedefini geri yükleyemez). NETCoreSdkVersion
+      bu dosya okunduktan sonra tanımlandığından SDK sürümü, erken tanımlı MSBuildVersion'dan çıkarılır (.NET 9 SDK → 17.12+).
+    -->
+    <PushizoNet9 Condition="'$(PushizoNet9)' == '' and $([MSBuild]::VersionGreaterThanOrEquals('$(MSBuildVersion)', '17.12'))">true</PushizoNet9>
     <PushizoAndroidTargets>net8.0-android</PushizoAndroidTargets>
     <PushizoAndroidTargets Condition="'$(PushizoNet9)' == 'true'">net8.0-android;net9.0-android</PushizoAndroidTargets>
     <PushizoIosTargets>net8.0-ios</PushizoIosTargets>

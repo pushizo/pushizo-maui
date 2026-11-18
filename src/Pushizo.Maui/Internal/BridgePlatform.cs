@@ -39,6 +39,9 @@ internal sealed class BridgePlatform : IPushizoPlatform
     public void Login(string externalId, string? identityHash, string? jwt) =>
         ThrowIfFailed(_bridge.Login(externalId, identityHash, jwt));
 
+    public void Login(string externalId, PushizoUserProfile profile, string? identityHash, string? jwt) =>
+        ThrowIfFailed(_bridge.LoginWithProfile(externalId, BridgeJson.UserProfileToJson(profile), identityHash, jwt));
+
     public void UpdateUserJwt(string jwt) => ThrowIfFailed(_bridge.UpdateUserJwt(jwt));
 
     /// <summary>Yerel köprünün döndürdüğü kimlik hatası (kanıt eksik, kullanıcı yok) <c>NOT_READY</c> olarak fırlatılır.</summary>
@@ -67,6 +70,11 @@ internal sealed class BridgePlatform : IPushizoPlatform
 
     public void SetLanguage(string languageCode) => _bridge.SetLanguage(languageCode);
 
+    public void SetUserProperty(string key, object? value)
+    {
+        if (_bridge.SetUserProperty(key, EventProperties.ValueToJson(value)) is { } error) throw new ArgumentException(error, nameof(key));
+    }
+
     public void AddEmail(string email) => _bridge.AddEmail(email);
 
     public void RemoveEmail(string email) => _bridge.RemoveEmail(email);
@@ -88,6 +96,19 @@ internal sealed class BridgePlatform : IPushizoPlatform
         return Call(r => _bridge.SetPreferences(json, r), result => BridgeJson.ParsePreferences(Require(result)));
     }
 
+    public void RegisterAdm(string token)
+    {
+        if (_bridge.RegisterAdm(token) is { } error) throw new ArgumentException(error, nameof(token));
+    }
+
+    public Task<UserPreferences> SetAdsPersonalizationConsentAsync(bool granted) =>
+        Call(r => _bridge.SetAdsPersonalizationConsent(granted, r), json => BridgeJson.ParsePreferences(Require(json)));
+
+    public Task<IReadOnlyList<UserConsent>> GetConsentsAsync() =>
+        Call(r => _bridge.GetConsents(r), json => BridgeJson.ParseConsents(Require(json)));
+
+    public void SetAdvertisingId(string? id) => _bridge.SetAdvertisingId(id);
+
     public PushSubscriptionState PushSubscription => BridgeJson.ParseSubscriptionState(_bridge.GetPushSubscription());
 
     public void OptIn() => _bridge.OptIn();
@@ -104,6 +125,10 @@ internal sealed class BridgePlatform : IPushizoPlatform
     public void RemoveNotification(string id) => _bridge.RemoveNotification(id);
 
     public void RemoveGroupedNotifications(string group) => _bridge.RemoveGroupedNotifications(group);
+
+    public bool SetBadgeCount(int count) => _bridge.SetBadgeCount(count);
+
+    public int BadgeCount => _bridge.GetBadgeCount();
 
     public void AddTriggers(IReadOnlyDictionary<string, string> triggers) => _bridge.AddTriggers(BridgeJson.ToJson(triggers));
 
@@ -136,11 +161,23 @@ internal sealed class BridgePlatform : IPushizoPlatform
     public Task<int> InboxUnreadCountAsync() =>
         Call(r => _bridge.InboxUnreadCount(r), json => BridgeJson.ParseUnreadCount(Require(json)));
 
+    public Task<ContentCardFeed> ContentCardsListAsync(int limit) =>
+        Call(r => _bridge.ContentCardsList(limit, r), json => BridgeJson.ParseContentCardFeed(Require(json)));
+
+    public Task<ContentCard> ContentCardEventAsync(string id, string eventName) =>
+        Call(r => _bridge.ContentCardEvent(id, eventName, r), json => BridgeJson.ParseContentCard(Require(json)));
+
     public Task<string?> ChatCallAsync(string method, string argsJson) =>
         Call(r => _bridge.ChatCall(method, argsJson, r), json => json);
 
-    public void SendEvent(string name, Dictionary<string, object?> properties, double? value) =>
-        _bridge.SendEvent(name, EventProperties.ToJson(properties), value ?? 0d, value.HasValue);
+    public void ChatShow() => _bridge.ChatShow();
+
+    public bool ChatHide() => _bridge.ChatHide();
+
+    public bool ChatIsPresented => _bridge.ChatIsPresented();
+
+    public void SendEvent(string name, Dictionary<string, object?> properties, double? value, string? eventId) =>
+        _bridge.SendEvent(name, EventProperties.ToJson(properties), value ?? 0d, value.HasValue, eventId);
 
     public Task SetupDefaultLiveActivityAsync() =>
         _bridge.SupportsLiveActivities
@@ -161,6 +198,42 @@ internal sealed class BridgePlatform : IPushizoPlatform
 
     public Task<bool> RequestLocationPermissionAsync(string? rationale) =>
         AskPermission(completion => _bridge.RequestLocationPermission(rationale, completion));
+
+    public bool LocationPermissionGranted => _bridge.GetLocationPermissionGranted();
+
+    public bool LocationBackgroundPermissionGranted => _bridge.GetLocationBackgroundPermissionGranted();
+
+    public Task<bool> RequestBackgroundLocationPermissionAsync(string? rationale) =>
+        AskPermission(completion => _bridge.RequestBackgroundLocationPermission(rationale, completion));
+
+    public bool GeofencingEnabled => _bridge.GetGeofencingEnabled();
+
+    public void SetGeofencingEnabled(bool enabled) => _bridge.SetGeofencingEnabled(enabled);
+
+    public DeliveryStatus GetDeliveryStatus() => BridgeJson.ParseDeliveryStatus(_bridge.DeliveryStatus());
+
+    public bool ShouldShowDeliveryGuidance(int minIntervalDays) => _bridge.DeliveryShouldShowGuidance(minIntervalDays);
+
+    public bool OpenDeliverySettings(DeliverySetting setting) => _bridge.DeliveryOpenSettings(BridgeJson.DeliverySettingWire(setting));
+
+    public Task<bool> ShowDeliveryGuidanceAsync(DeliverySetting setting, string? message) =>
+        AskPermission(completion => _bridge.DeliveryShowGuidance(BridgeJson.DeliverySettingWire(setting), message, completion));
+
+    public Task<bool> RefreshFeatureFlagsAsync() =>
+        Call(r => _bridge.FeatureFlagsRefresh(r), json => BridgeJson.ParseRefreshed(Require(json)));
+
+    public bool IsFeatureFlagEnabled(string key, bool defaultValue) => _bridge.FeatureFlagEnabled(key, defaultValue);
+
+    public object? GetFeatureFlagValue(string key) => BridgeJson.ParseFlagValue(_bridge.FeatureFlagValue(key));
+
+    public Task<IReadOnlyList<InAppMessage>> PlacementsListAsync(string key, int limit) =>
+        Call(r => _bridge.PlacementsList(key, limit, r), json => BridgeJson.ParsePlacementMessages(Require(json)));
+
+    public void PlacementsReportImpression(string messageId) => _bridge.PlacementsReportImpression(messageId);
+
+    public void PlacementsReportClick(string messageId, string buttonId) => _bridge.PlacementsReportClick(messageId, buttonId);
+
+    public void PlacementsReportDismiss(string messageId) => _bridge.PlacementsReportDismiss(messageId);
 
     /// <summary>Yerel izin geri çağrısını (herhangi bir iş parçacığından, bir kez) Task'a çevirir.</summary>
     private static Task<bool> AskPermission(Action<Action<bool>> invoke)

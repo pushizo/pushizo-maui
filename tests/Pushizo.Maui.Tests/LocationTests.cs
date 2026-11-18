@@ -2,7 +2,10 @@ using PushizoSdk.Maui.Internal;
 
 namespace PushizoSdk.Maui.Tests;
 
-/// <summary>Konum paylaşımı (v2 Faz 17b): köprüye iletim, açıklama metni normalizasyonu ve desteklenmeyen hedefler.</summary>
+/// <summary>
+/// Konum paylaşımı (v2 Faz 17b) ve arka plan bölge izleme (ADR-0065): köprüye iletim, açıklama metni normalizasyonu ve
+/// desteklenmeyen hedefler.
+/// </summary>
 public sealed class LocationTests : PushizoTestBase
 {
     [Fact]
@@ -78,5 +81,34 @@ public sealed class LocationTests : PushizoTestBase
         Pushizo.Location.SetShared(true);
         Assert.False(Pushizo.Location.IsShared);
         Assert.False(await Pushizo.Location.RequestPermissionAsync("açıklama"));
+        Pushizo.Location.SetGeofencingEnabled(true);
+        Assert.False(Pushizo.Location.IsGeofencingEnabled);
+    }
+
+    [Fact]
+    public void Geofencing_is_off_by_default_and_reaches_bridge()
+    {
+        InitializeSdk();
+        Assert.False(Pushizo.Location.IsGeofencingEnabled);
+
+        Pushizo.Location.SetGeofencingEnabled(true);
+        Assert.True(Pushizo.Location.IsGeofencingEnabled);
+        Pushizo.Location.SetGeofencingEnabled(false);
+        Assert.False(Pushizo.Location.IsGeofencingEnabled);
+
+        // Köprü izin istemez: yalnızca tercih yazılır, izin çağrısı yoktur.
+        Assert.Equal(new[] { "geofencing:True", "geofencing:False" }, Bridge.Calls);
+    }
+
+    [Fact]
+    public void Geofencing_reads_native_preference_and_is_safe_before_initialize()
+    {
+        Bridge.GeofencingEnabledValue = true;
+        Assert.False(Pushizo.Location.IsGeofencingEnabled);
+        Assert.Throws<InvalidOperationException>(() => Pushizo.Location.SetGeofencingEnabled(true));
+
+        InitializeSdk();
+        Assert.True(Pushizo.Location.IsGeofencingEnabled);
+        Assert.Empty(Bridge.Calls);
     }
 }

@@ -118,6 +118,25 @@ internal static partial class Validation
         if (limit is < 1 or > 200) throw new ArgumentOutOfRangeException(paramName, limit, "limit 1-200 olmalı.");
     }
 
+    public static void RequireContentCardLimit(int limit, string paramName)
+    {
+        if (limit is < 1 or > 100) throw new ArgumentOutOfRangeException(paramName, limit, "limit 1-100 olmalı.");
+    }
+
+    [GeneratedRegex(@"^[a-z][a-z0-9_.-]{0,63}\z", RegexOptions.CultureInvariant)]
+    private static partial Regex PlacementKeyRegex();
+
+    /// <summary>Yerleşim anahtarı (yerel SDK kuralı): küçük harfle başlar; küçük harf, rakam ve <c>_ . -</c>; 1-64 karakter.</summary>
+    public static string RequirePlacementKey(string key, string paramName) =>
+        key is not null && PlacementKeyRegex().IsMatch(key)
+            ? key
+            : throw new ArgumentException("Geçersiz yerleşim anahtarı: küçük harfle başlamalı; küçük harf, rakam ve _ . - (en fazla 64).", paramName);
+
+    public static void RequirePlacementLimit(int limit, string paramName)
+    {
+        if (limit is < 1 or > 10) throw new ArgumentOutOfRangeException(paramName, limit, "limit 1-10 olmalı.");
+    }
+
     // \z: .NET'te $ sondaki satır sonunu da kabul eder.
     [GeneratedRegex(@"^[A-Za-z0-9_.:-]{1,100}\z", RegexOptions.CultureInvariant)]
     private static partial Regex LiveActivityIdRegex();

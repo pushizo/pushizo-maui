@@ -77,6 +77,73 @@ internal sealed class FakeNativeBridge : INativeBridge
         return LoginError;
     }
 
+    public string? LoginWithProfile(string externalId, string profileJson, string? identityHash, string? jwt)
+    {
+        Record($"loginWithProfile:{externalId}:{profileJson}:{identityHash ?? "<null>"}:{jwt ?? "<null>"}");
+        return LoginError;
+    }
+
+    /// <summary>RegisterAdm yanıtı (yerel SDK'nın geçersiz kimlik hatası; null = başarı).</summary>
+    public string? RegisterAdmError { get; set; }
+
+    public string? RegisterAdm(string token)
+    {
+        Record($"registerAdm:{token}");
+        return RegisterAdmError;
+    }
+
+    /// <summary>Rıza yanıtı: (json, hata kodu, hata mesajı).</summary>
+    public (string? Json, string? Code, string? Message) ConsentsResponse { get; set; } = ("""{"consents":[]}""", null, null);
+
+    public void SetAdsPersonalizationConsent(bool granted, NativeResult result) =>
+        Respond($"setAdsPersonalizationConsent:{granted}", PreferencesResponse, result);
+
+    public void GetConsents(NativeResult result) => Respond("getConsents", ConsentsResponse, result);
+    public void SetAdvertisingId(string? id) => Record($"advertisingId:{id ?? "<null>"}");
+
+    /// <summary>Rozet çağrısının sonucu (Android: rozet gösterilebiliyor mu; iOS: her zaman true).</summary>
+    public bool BadgeResult { get; set; } = true;
+
+    /// <summary>Yerel SDK'daki rozet sayısı.</summary>
+    public int BadgeCountValue { get; private set; }
+
+    public bool SetBadgeCount(int count)
+    {
+        Record($"badge:{count}");
+        BadgeCountValue = count;
+        return BadgeResult;
+    }
+
+    public int GetBadgeCount() => BadgeCountValue;
+
+    /// <summary>SetUserProperty yanıtı (Android yerel SDK'sının anahtar hatası; null = başarı).</summary>
+    public string? UserPropertyError { get; set; }
+
+    public string? SetUserProperty(string key, string valueJson)
+    {
+        Record($"setUserProperty:{key}:{valueJson}");
+        return UserPropertyError;
+    }
+
+    /// <summary>Hazır sohbet ekranı açık mı (yerel SDK durumu).</summary>
+    public bool ChatPresented { get; private set; }
+
+    public void ChatShow()
+    {
+        Record("chatShow");
+        ChatPresented = true;
+    }
+
+    public bool ChatHide()
+    {
+        Record("chatHide");
+        var presented = ChatPresented;
+        ChatPresented = false;
+        return presented;
+    }
+
+    public bool ChatIsPresented() => ChatPresented;
+
     public string? UpdateUserJwt(string jwt)
     {
         Record($"updateUserJwt:{jwt}");
@@ -140,13 +207,19 @@ internal sealed class FakeNativeBridge : INativeBridge
     public void InboxMarkAllRead(NativeResult result) => Respond("inboxMarkAllRead", result);
     public void InboxArchive(string id, NativeResult result) => Respond($"inboxArchive:{id}", result);
     public void InboxUnreadCount(NativeResult result) => Respond("inboxUnreadCount", result);
+    public void ContentCardsList(int limit, NativeResult result) => Respond($"contentCardsList:{limit}", result);
+    public void ContentCardEvent(string id, string eventName, NativeResult result) => Respond($"contentCardEvent:{id}:{eventName}", result);
     public void GetPreferences(NativeResult result) => Respond("getPreferences", PreferencesResponse, result);
     public void SetPreferences(string preferencesJson, NativeResult result) => Respond($"setPreferences:{preferencesJson}", PreferencesResponse, result);
 
-    public void SendEvent(string name, string propertiesJson, double value, bool hasValue)
+    /// <summary>Son olayın tekilleştirme kimliği (verilmediyse null).</summary>
+    public string? LastEventId { get; private set; }
+
+    public void SendEvent(string name, string propertiesJson, double value, bool hasValue, string? eventId)
     {
         Record($"sendEvent:{name}");
         LastEvent = (name, propertiesJson, value, hasValue);
+        LastEventId = eventId;
     }
 
     /// <summary>false: Android köprüsü gibi Live Activities desteklenmez.</summary>
@@ -183,6 +256,99 @@ internal sealed class FakeNativeBridge : INativeBridge
         // Gerçek köprüler sonucu başka bir iş parçacığından (iOS: ana, Android: UI/yaşam döngüsü) döndürür.
         ThreadPool.QueueUserWorkItem(_ => completion(LocationPermissionResult));
     }
+
+    public bool LocationPermissionGrantedValue { get; set; }
+    public bool LocationBackgroundPermissionGrantedValue { get; set; }
+
+    /// <summary>Arka plan konum izni isteğinin sonucu.</summary>
+    public bool BackgroundLocationPermissionResult { get; set; } = true;
+
+    public bool GetLocationPermissionGranted() => LocationPermissionGrantedValue;
+    public bool GetLocationBackgroundPermissionGranted() => LocationBackgroundPermissionGrantedValue;
+
+    public void RequestBackgroundLocationPermission(string? rationale, Action<bool> completion)
+    {
+        Record("requestBackgroundLocationPermission");
+        LastLocationRationale = rationale;
+        ThreadPool.QueueUserWorkItem(_ => completion(BackgroundLocationPermissionResult));
+    }
+
+    /// <summary>Yerel SDK'daki kalıcı bölge izleme tercihi.</summary>
+    public bool GeofencingEnabledValue { get; set; }
+
+    public bool GetGeofencingEnabled() => GeofencingEnabledValue;
+
+    public void SetGeofencingEnabled(bool enabled)
+    {
+        Record($"geofencing:{enabled}");
+        GeofencingEnabledValue = enabled;
+    }
+
+    /// <summary>Yerel teslim durumu JSON'u (null: teşhis yok).</summary>
+    public string? DeliveryStatusJson { get; set; }
+
+    /// <summary><c>shouldShowGuidance</c>, <c>openSettings</c> ve <c>showGuidance</c> sonucu.</summary>
+    public bool DeliveryResult { get; set; } = true;
+
+    /// <summary>Teslimat çağrılarında fırlatılacak yerel hata (JNI hatası benzetimi).</summary>
+    public Exception? DeliveryFailure { get; set; }
+
+    public string? DeliveryStatus()
+    {
+        Record("deliveryStatus");
+        if (DeliveryFailure is not null) throw DeliveryFailure;
+        return DeliveryStatusJson;
+    }
+
+    public bool DeliveryShouldShowGuidance(int minIntervalDays)
+    {
+        Record($"deliveryShouldShowGuidance:{minIntervalDays}");
+        if (DeliveryFailure is not null) throw DeliveryFailure;
+        return DeliveryResult;
+    }
+
+    public bool DeliveryOpenSettings(string setting)
+    {
+        Record($"deliveryOpenSettings:{setting}");
+        if (DeliveryFailure is not null) throw DeliveryFailure;
+        return DeliveryResult;
+    }
+
+    public void DeliveryShowGuidance(string setting, string? message, Action<bool> completion)
+    {
+        Record($"deliveryShowGuidance:{setting}:{message ?? "<null>"}");
+        if (DeliveryFailure is not null) throw DeliveryFailure;
+        // Gerçek köprü sonucu arayüz iş parçacığından döndürür.
+        ThreadPool.QueueUserWorkItem(_ => completion(DeliveryResult));
+    }
+
+    /// <summary>Bayrak yenileme yanıtı: (json, hata kodu, hata mesajı).</summary>
+    public (string? Json, string? Code, string? Message) FeatureFlagsRefreshResponse { get; set; } = ("""{"refreshed":true}""", null, null);
+
+    /// <summary>Yerel bayrak önbelleği: anahtar → (açık mı, <c>{"value":…}</c> JSON'u ya da null).</summary>
+    public Dictionary<string, (bool Enabled, string? ValueJson)> FeatureFlags { get; } = new();
+
+    public void FeatureFlagsRefresh(NativeResult result) => Respond("featureFlagsRefresh", FeatureFlagsRefreshResponse, result);
+
+    public bool FeatureFlagEnabled(string key, bool fallback)
+    {
+        Record($"featureFlagEnabled:{key}:{fallback}");
+        return FeatureFlags.TryGetValue(key, out var flag) ? flag.Enabled : fallback;
+    }
+
+    public string? FeatureFlagValue(string key)
+    {
+        Record($"featureFlagValue:{key}");
+        return FeatureFlags.TryGetValue(key, out var flag) ? flag.ValueJson : null;
+    }
+
+    /// <summary>Yerleşim yanıtı: (json, hata kodu, hata mesajı).</summary>
+    public (string? Json, string? Code, string? Message) PlacementsResponse { get; set; } = ("""{"messages":[]}""", null, null);
+
+    public void PlacementsList(string key, int limit, NativeResult result) => Respond($"placementsList:{key}:{limit}", PlacementsResponse, result);
+    public void PlacementsReportImpression(string messageId) => Record($"placementImpression:{messageId}");
+    public void PlacementsReportClick(string messageId, string buttonId) => Record($"placementClick:{messageId}:{buttonId}");
+    public void PlacementsReportDismiss(string messageId) => Record($"placementDismiss:{messageId}");
 
     public void ForegroundPreventDefault(string eventId) => Record($"preventDefault:{eventId}");
     public void ForegroundDisplay(string eventId) => Record($"display:{eventId}");
